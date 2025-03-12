@@ -31,4 +31,5 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
     }
 }
 
+
 #endif /* MOUSE_CALLBACK_H */

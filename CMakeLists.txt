@@ -146,6 +146,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/src/resources"
     "${CMAKE_BINARY_DIR}/bin/Release/resources"
-    COMMENT "Copying resources folder to output directory"
+    # print the dir it is dumping the resources to
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying resources to ${CMAKE_BINARY_DIR}/bin/Release/resources"
 )
 endif()

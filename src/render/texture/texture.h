@@ -2,6 +2,7 @@
 #define TEXTURE_H
 
 #include <glad/glad.h>
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 #include <spdlog/spdlog.h>
 
@@ -24,7 +25,7 @@ static void loadTexture(const char *filepath, GLuint &planeTexture)
         GLenum format = nrChannels == 3 ? GL_RGB : GL_RGBA;
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
-        spdlog::info("Texture loaded successfully: {}x{}", width, height);
+        spdlog::info("Texture: {} loaded successfully: {}x{}", filepath, width, height);
     }
     else
     {
