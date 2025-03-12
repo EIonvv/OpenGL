@@ -21,11 +21,20 @@
 
 // Initial target FPS (can be overridden by command-line argument)
 static int targetFPS = 144;
+// Initial target frame time based on target FPS
 static double targetFrameTime = 1.0 / targetFPS;
 
 // Cube vertices
 static const Vertex vertices[8] = {
-    {{-0.5, -0.5, 0.5}, {1.0, 0.0, 0.0}}, {{0.5, -0.5, 0.5}, {0.0, 1.0, 0.0}}, {{0.5, 0.5, 0.5}, {0.0, 0.0, 1.0}}, {{-0.5, 0.5, 0.5}, {1.0, 0.0, 1.0}}, {{-0.5, -0.5, -0.5}, {1.0, 0.0, 0.0}}, {{0.5, -0.5, -0.5}, {0.0, 1.0, 0.0}}, {{0.5, 0.5, -0.5}, {0.0, 0.0, 1.0}}, {{-0.5, 0.5, -0.5}, {1.0, 0.0, 1.0}}};
+    {{-0.5, -0.5, 0.5}, {1.0, 0.0, 0.0}},
+    {{0.5, -0.5, 0.5}, {0.0, 1.0, 0.0}},
+    {{0.5, 0.5, 0.5}, {0.0, 0.0, 1.0}},
+    {{-0.5, 0.5, 0.5}, {1.0, 0.0, 1.0}},
+    {{-0.5, -0.5, -0.5}, {1.0, 0.0, 0.0}},
+    {{0.5, -0.5, -0.5}, {0.0, 1.0, 0.0}},
+    {{0.5, 0.5, -0.5}, {0.0, 0.0, 1.0}},
+    {{-0.5, 0.5, -0.5}, {1.0, 0.0, 1.0}},
+};
 
 // Cube indices
 static const GLuint indices[36] = {
@@ -157,6 +166,29 @@ int main(int argc, char *argv[])
 
     double previousTime = glfwGetTime();
 
+        if (textRenderer == nullptr)
+    {
+        try
+        {
+            // find main boot drive then append the path to the font file
+            // first find the boot drive
+            char bootDrive[MAX_PATH];
+            GetWindowsDirectory(bootDrive, MAX_PATH);
+            std::string bootDriveStr(bootDrive);
+            std::string fontPath = bootDriveStr + "\\Fonts\\arial.ttf";
+
+            spdlog::info("Font path: {}", fontPath);
+
+            textRenderer = new TextRenderer(fontPath.c_str(), 48);
+        }
+        catch (const std::exception &e)
+        {
+            spdlog::error("Failed to initialize TextRenderer: {}", e.what());
+            glfwTerminate();
+            return -1;
+        }
+    }
+
     while (!glfwWindowShouldClose(window))
     {
         double currentTime = glfwGetTime();
@@ -177,6 +209,15 @@ int main(int argc, char *argv[])
             std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((targetFrameTime - deltaTime) * 1000)));
             currentTime = glfwGetTime();
             deltaTime = currentTime - previousTime;
+
+            // Recalculate FPS
+            frameCount++;
+            if (currentTime - lastTime >= 1.0)
+            {
+                currentFPS = frameCount / (currentTime - lastTime);
+                frameCount = 0;
+                lastTime = currentTime;
+            }
         }
 
         int width, height;
@@ -221,24 +262,10 @@ int main(int argc, char *argv[])
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), ratio, 0.1f, 100.0f);
         glm::mat4 mvp = projection * view * model;
 
-        if (textRenderer == nullptr)
-        {
-            try
-            {
-                textRenderer = new TextRenderer("C:/Windows/Fonts/ARLRDBD.ttf", 48);
-                spdlog::info("TextRenderer initialized successfully");
-            }
-            catch (const std::exception &e)
-            {
-                spdlog::error("Failed to initialize TextRenderer: {}", e.what());
-                glfwTerminate();
-                return -1;
-            }
-        }
-
         // Render FPS text
-        char fpsText[32];
+        char fpsText[16];
         snprintf(fpsText, sizeof(fpsText), "FPS: %.1f", currentFPS);
+        //                          text,     x,     y, scale, color
         textRenderer->renderText(fpsText, 10.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f));
 
         glUseProgram(program);

@@ -9,5 +9,4 @@ typedef struct Vertex
     glm::vec3 col;
 } Vertex;
 
-
 #endif /* VERTEX_H */
