@@ -1,9 +1,20 @@
 cmake_minimum_required(VERSION 3.10)
-project(3D)
+project(
+    OpenGLRendering
+    VERSION 1.0.0
+    DESCRIPTION "OpenGL Text Rendering"
+    LANGUAGES CXX C
+)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Enable LTO (Link Time Optimization) in Release builds
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+
+# Default to static libraries, but allow override
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # Enable FetchContent
 include(FetchContent)
