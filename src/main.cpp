@@ -433,10 +433,9 @@ void initializeTextRenderer()
 // Handle input and update cube state
 void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio, double deltaTime)
 {
-    // Camera movement
-    float speed = static_cast<float>(deltaTime) * 3.0f;
-
-    // Removed cubePOVMode toggle logic from here as it's now in keyboard.h
+    // Camera and cube movement
+    float baseSpeed = static_cast<float>(deltaTime) * 12.0f; // Base speed of 12 units per second
+    float speed = baseSpeed;                                 // Default speed, adjusted for POV mode if needed
 
     glm::vec3 direction;
     direction.x = cos(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
@@ -447,54 +446,91 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
     glm::vec3 right = glm::normalize(glm::cross(direction, glm::vec3(0.0f, 1.0f, 0.0f)));
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f); // Ensure up vector is consistent
 
-    if (pressing_w)
-        cameraPos += direction * speed; // Move forward
-    if (pressing_s)
-        cameraPos -= direction * speed; // Move backward
-    if (pressing_a)
-        cameraPos -= right * speed; // Move left
-    if (pressing_d)
-        cameraPos += right * speed; // Move right
-
     if (cubePOVMode)
     {
-
-        // In cube POV mode, WASD moves the cube along the plane
+        speed = static_cast<float>(deltaTime) * 3.0f;        // Slower speed in POV mode for precision
         SquarePos.y = -0.5f;                                 // Keep cube on the plane (plane at y = -1, cube height = 1)
         cameraPos = SquarePos + glm::vec3(0.0f, 0.5f, 0.0f); // Camera at cube center
 
-        // Handle arrow keys for moving the cube
-        if (pressing_up)
-            SquarePos.z -= speed; // Move cube forward
-        if (pressing_down)
-            SquarePos.z += speed; // Move cube backward
-        if (pressing_left)
-            SquarePos.x -= speed; // Move cube left
-        if (pressing_right)
-            SquarePos.x += speed; // Move cube right
+        // Gravity and collision
+        SquarePos.y -= 0.1f * static_cast<float>(deltaTime); // Simple gravity
+        if (isCubeCollidingWithPlane(model, vertices, planeVertices))
+        {
+            float lowestY = std::numeric_limits<float>::max();
+            for (int i = 0; i < 8; i++)
+            {
+                glm::vec4 vertex(vertices[i].pos[0], vertices[i].pos[1], vertices[i].pos[2], 1.0f);
+                glm::vec4 worldPos = model * vertex;
+                lowestY = std::min(lowestY, worldPos.y);
+            }
+
+            // if the player is outside the plane, let them fall back onto it by tp'ing them to the plane
+            float planeY = -1.0f;
+
+            if (lowestY < planeY)
+                SquarePos.y += (planeY - lowestY);
+
+            // if the player is inside the plane, let them fall back onto it by tp'ing them to the plane
+            if (lowestY > planeY)
+                SquarePos.y -= (lowestY - planeY);
+
+            // if the player is on the plane, let them stay on the plane
+            if (lowestY == planeY)
+                SquarePos.y = -1.0f;
+
+            // if the player is above the plane, let them fall back onto it by tp'ing them to the plane
+            if (lowestY > planeY)
+                SquarePos.y -= (lowestY - planeY);
+        }
     }
-    else
+
+    // Use WASD for movement in both modes
+    if (pressing_w)
     {
-        // Normal mode: WASD moves camera, arrow keys move cube
-        if (pressing_w)
-            cameraPos += direction * speed * static_cast<float>(deltaTime);
-        if (pressing_s)
-            cameraPos -= direction * speed * static_cast<float>(deltaTime);
-        if (pressing_a)
-            cameraPos -= right * speed * static_cast<float>(deltaTime);
-        if (pressing_d)
-            cameraPos += right * speed * static_cast<float>(deltaTime);
+        if (cubePOVMode)
+            SquarePos += direction * speed;
+        else
+            cameraPos += direction * speed;
+    }
+    if (pressing_s)
+    {
+        if (cubePOVMode)
+            SquarePos -= direction * speed;
+        else
+            cameraPos -= direction * speed;
+    }
+    if (pressing_a)
+    {
+        if (cubePOVMode)
+            SquarePos -= right * speed;
+        else
+            cameraPos -= right * speed;
+    }
+    if (pressing_d)
+    {
+        if (cubePOVMode)
+            SquarePos += right * speed;
+        else
+            cameraPos += right * speed;
+    }
 
-        if (pressing_up)
-            SquarePos.z -= speed * static_cast<float>(deltaTime);
-        if (pressing_down)
-            SquarePos.z += speed * static_cast<float>(deltaTime);
-        if (pressing_left)
-            SquarePos.x -= speed * static_cast<float>(deltaTime);
-        if (pressing_right)
-            SquarePos.x += speed * static_cast<float>(deltaTime);
+    // Optional: Use arrow keys for rotation (pitch and yaw)
+    float rotationSpeed = 60.0f * static_cast<float>(deltaTime); // 60 degrees per second
+    if (pressing_up)
+        rotationAngles.x -= rotationSpeed; // Pitch up
+    if (pressing_down)
+        rotationAngles.x += rotationSpeed; // Pitch down
+    if (pressing_left)
+        rotationAngles.y -= rotationSpeed; // Yaw left
+    if (pressing_right)
+        rotationAngles.y += rotationSpeed; // Yaw right
 
-        // Mouse dragging
+    // Clamp pitch to avoid flipping
+    rotationAngles.x = glm::clamp(rotationAngles.x, -89.0f, 89.0f);
+
+    if (!cubePOVMode)
+    {
+        // Mouse dragging in free mode
         glm::vec2 mousePos = GetMouse::getMousePosition(window);
         bool isMouseOverCube = isPointInCube(mousePos, mvp, width, height);
         if (isDragging && isMouseOverCube)
@@ -522,15 +558,14 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         }
     }
 
-    // Rest of the function remains unchanged...
+    // Mouse dragging in POV mode (optional, can be adjusted or removed)
     glm::vec2 mousePos = GetMouse::getMousePosition(window);
     bool isMouseOverCube = isPointInCube(mousePos, mvp, width, height);
-
     if (isDragging && isMouseOverCube)
     {
         glm::vec2 delta = mousePos - lastMousePos;
         SquarePos.x += delta.x * 0.002f;
-        SquarePos.z -= delta.y * glm::clamp(0.002f * ratio, 0.002f, 0.01f); // Changed to z to match plane orientation
+        SquarePos.z -= delta.y * glm::clamp(0.002f * ratio, 0.002f, 0.01f);
         if (mode == debug)
             spdlog::info("Cube position: ({}, {}, {})", SquarePos.x, SquarePos.y, SquarePos.z);
     }
@@ -549,7 +584,6 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), ratio, 0.1f, 100.0f);
     mvp = projection * view * model;
 }
-
 // Calculate FPS and enforce frame rate
 void updateFrameTiming(double &previousTime, double &deltaTime)
 {
