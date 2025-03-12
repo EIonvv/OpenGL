@@ -13,7 +13,9 @@
 #include "keyboard/keyboard.h"
 #include "mouse/mouse_callback/mouse_callback.h"
 #include "mouse/mouse_position/get_mouse_position.h"
+
 #include "render/vertex/vertex.h"
+#include "render/text/text_renderer.h"
 
 #include "config.h"
 
@@ -23,18 +25,13 @@ static double targetFrameTime = 1.0 / targetFPS;
 
 // Cube vertices
 static const Vertex vertices[8] = {
-    {{-0.5, -0.5,  0.5}, {1.0, 0.0, 0.0}}, {{ 0.5, -0.5,  0.5}, {0.0, 1.0, 0.0}},
-    {{ 0.5,  0.5,  0.5}, {0.0, 0.0, 1.0}}, {{-0.5,  0.5,  0.5}, {1.0, 0.0, 1.0}},
-    {{-0.5, -0.5, -0.5}, {1.0, 0.0, 0.0}}, {{ 0.5, -0.5, -0.5}, {0.0, 1.0, 0.0}},
-    {{ 0.5,  0.5, -0.5}, {0.0, 0.0, 1.0}}, {{-0.5,  0.5, -0.5}, {1.0, 0.0, 1.0}}
-};
+    {{-0.5, -0.5, 0.5}, {1.0, 0.0, 0.0}}, {{0.5, -0.5, 0.5}, {0.0, 1.0, 0.0}}, {{0.5, 0.5, 0.5}, {0.0, 0.0, 1.0}}, {{-0.5, 0.5, 0.5}, {1.0, 0.0, 1.0}}, {{-0.5, -0.5, -0.5}, {1.0, 0.0, 0.0}}, {{0.5, -0.5, -0.5}, {0.0, 1.0, 0.0}}, {{0.5, 0.5, -0.5}, {0.0, 0.0, 1.0}}, {{-0.5, 0.5, -0.5}, {1.0, 0.0, 1.0}}};
 
 // Cube indices
 static const GLuint indices[36] = {
     0, 1, 2, 2, 3, 0, 1, 5, 6, 6, 2, 1,
     5, 4, 7, 7, 6, 5, 4, 0, 3, 3, 7, 4,
-    3, 2, 6, 6, 7, 3, 0, 4, 5, 5, 1, 0
-};
+    3, 2, 6, 6, 7, 3, 0, 4, 5, 5, 1, 0};
 
 // Cube shaders
 static const char *vertex_shader_text =
@@ -70,19 +67,23 @@ static glm::vec3 rotationAngles(0.0f);
 static double lastTime = 0.0;
 static int frameCount = 0;
 static double currentFPS = 0.0;
+static TextRenderer *textRenderer;
 
-void displayFPS(GLFWwindow* window) {
+void displayFPS(GLFWwindow *window)
+{
     char title[64];
     snprintf(title, sizeof(title), "3D Draggable Cube - Target: %d, FPS: %.1f", targetFPS, currentFPS);
     glfwSetWindowTitle(window, title);
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     // Override default FPS with command-line argument if provided
-    if (argc > 1) {
+    if (argc > 1)
+    {
         targetFPS = std::atoi(argv[1]);
-        if (targetFPS <= 0) {
+        if (targetFPS <= 0)
+        {
             spdlog::warn("Invalid FPS value provided. Using default: 144");
             targetFPS = 144;
         }
@@ -150,9 +151,9 @@ int main(int argc, char* argv[])
     glGenVertexArrays(1, &vertex_array);
     glBindVertexArray(vertex_array);
     glEnableVertexAttribArray(vpos_location);
-    glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, pos));
+    glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
     glEnableVertexAttribArray(vcol_location);
-    glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, col));
+    glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, col));
 
     double previousTime = glfwGetTime();
 
@@ -163,14 +164,16 @@ int main(int argc, char* argv[])
 
         // FPS calculation
         frameCount++;
-        if (currentTime - lastTime >= 1.0) {
+        if (currentTime - lastTime >= 1.0)
+        {
             currentFPS = frameCount / (currentTime - lastTime);
             frameCount = 0;
             lastTime = currentTime;
         }
 
         // Frame limiting to target FPS
-        if (deltaTime < targetFrameTime) {
+        if (deltaTime < targetFrameTime)
+        {
             std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((targetFrameTime - deltaTime) * 1000)));
             currentTime = glfwGetTime();
             deltaTime = currentTime - previousTime;
@@ -195,10 +198,14 @@ int main(int argc, char* argv[])
         lastMousePos = mousePos;
 
         float rotationSpeed = 1.0f;
-        if (KeyState::keyStates[GLFW_KEY_UP]) rotationAngles.x += rotationSpeed;
-        if (KeyState::keyStates[GLFW_KEY_DOWN]) rotationAngles.x -= rotationSpeed;
-        if (KeyState::keyStates[GLFW_KEY_LEFT]) rotationAngles.y += rotationSpeed;
-        if (KeyState::keyStates[GLFW_KEY_RIGHT]) rotationAngles.y -= rotationSpeed;
+        if (KeyState::keyStates[GLFW_KEY_UP])
+            rotationAngles.x += rotationSpeed;
+        if (KeyState::keyStates[GLFW_KEY_DOWN])
+            rotationAngles.x -= rotationSpeed;
+        if (KeyState::keyStates[GLFW_KEY_LEFT])
+            rotationAngles.y += rotationSpeed;
+        if (KeyState::keyStates[GLFW_KEY_RIGHT])
+            rotationAngles.y -= rotationSpeed;
 
         // Render cube
         glm::mat4 model = glm::translate(glm::mat4(1.0f), trianglePos);
@@ -209,19 +216,36 @@ int main(int argc, char* argv[])
         glm::mat4 view = glm::lookAt(
             glm::vec3(0.0f, 0.0f, 3.0f),
             glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
+            glm::vec3(0.0f, 1.0f, 0.0f));
 
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), ratio, 0.1f, 100.0f);
         glm::mat4 mvp = projection * view * model;
+
+        if (textRenderer == nullptr)
+        {
+            try
+            {
+                textRenderer = new TextRenderer("C:/Windows/Fonts/ARLRDBD.ttf", 48);
+                spdlog::info("TextRenderer initialized successfully");
+            }
+            catch (const std::exception &e)
+            {
+                spdlog::error("Failed to initialize TextRenderer: {}", e.what());
+                glfwTerminate();
+                return -1;
+            }
+        }
+
+        // Render FPS text
+        char fpsText[32];
+        snprintf(fpsText, sizeof(fpsText), "FPS: %.1f", currentFPS);
+        textRenderer->renderText(fpsText, 10.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f));
 
         glUseProgram(program);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
         glBindVertexArray(vertex_array);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
-        displayFPS(window);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

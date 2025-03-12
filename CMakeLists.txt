@@ -15,7 +15,7 @@ if (NOT glfw3_FOUND)
     FetchContent_Declare(
         glfw
         GIT_REPOSITORY https://github.com/glfw/glfw.git
-        GIT_TAG 3.3.8  # Specify a stable release
+        GIT_TAG 3.3.8
     )
     set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -32,7 +32,7 @@ if (NOT glm_FOUND)
     FetchContent_Declare(
         glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
-        GIT_TAG 0.9.9.8  # Specify a stable release
+        GIT_TAG 0.9.9.8
     )
     FetchContent_MakeAvailable(glm)
 else()
@@ -46,54 +46,61 @@ if (NOT spdlog_FOUND)
     FetchContent_Declare(
         spdlog
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG v1.8.5  # Specify a stable release
+        GIT_TAG v1.8.5
     )
     FetchContent_MakeAvailable(spdlog)
 else()
     message(STATUS "spdlog found on system.")
 endif()
 
-# nlohmann_json
-find_package(nlohmann_json QUIET)
-if (NOT nlohmann_json_FOUND)
-    message(STATUS "nlohmann_json not found, fetching from GitHub...")
+# FreeType
+find_package(Freetype QUIET)
+if (NOT Freetype_FOUND)
+    message(STATUS "FreeType not found, fetching from GitHub...")
     FetchContent_Declare(
-        nlohmann_json
-        GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG v3.9.1  # Specify a stable release
+        freetype
+        GIT_REPOSITORY https://github.com/freetype/freetype.git
+        GIT_TAG VER-2-10-4
     )
-    FetchContent_MakeAvailable(nlohmann_json)
+    set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(freetype)
 else()
-    message(STATUS "nlohmann_json found on system.")
+    message(STATUS "FreeType found on system.")
 endif()
 
 # Add GLAD source files
-set(GLAD_DIR ${CMAKE_SOURCE_DIR}/include/glad)  # Adjust path if different
+set(GLAD_DIR ${CMAKE_SOURCE_DIR}/include/glad)
 add_library(glad STATIC
     include/src/glad.c
 )
 
+# Include directories for GLAD
 target_include_directories(glad PUBLIC ${GLAD_DIR})
 
 # Add your source files
 add_executable(${PROJECT_NAME}
     src/main.cpp
+    src/render/text/text_renderer.cpp
 )
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
-    include  # Your project headers
-    ${GLAD_DIR}  # GLAD headers
+    include
+    ${GLAD_DIR}
 )
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    glad      # Link the GLAD library
-    glfw      # Link the GLFW library (correct target name)
-    glm::glm  # GLM as a CMake target
-    spdlog::spdlog  # spdlog as a CMake target
-    nlohmann_json::nlohmann_json  # nlohmann_json as a CMake target
-    ${CMAKE_DL_LIBS}  # For dlopen/dlclose on Unix systems (empty on Windows)
+    glad
+    glfw
+    glm::glm
+    spdlog::spdlog
+    freetype
+    ${CMAKE_DL_LIBS}
 )
 
 # Specify output directory
