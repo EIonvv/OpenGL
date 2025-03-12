@@ -58,15 +58,20 @@ static const std::unordered_map<int, std::pair<std::string, std::string>> keyMap
     {GLFW_KEY_RIGHT_CONTROL, {"[R-CTRL]", "[R-CTRL]"}},
     {GLFW_KEY_LEFT_ALT, {"[L-ALT]", "[L-ALT]"}},
     {GLFW_KEY_RIGHT_ALT, {"[R-ALT]", "[R-ALT]"}},
+
+    // Arrow keys
+    {GLFW_KEY_UP, {"[UP]", "[UP]"}}, {GLFW_KEY_DOWN, {"[DOWN]", "[DOWN]"}},
+    {GLFW_KEY_LEFT, {"[LEFT]", "[LEFT]"}}, {GLFW_KEY_RIGHT, {"[RIGHT]", "[RIGHT]"}}
+    
 };
 
+// key_callback remains unchanged
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     const char* actionStr = (action == GLFW_PRESS) ? "pressed" :
                            (action == GLFW_RELEASE) ? "released" :
                            "repeated";
 
-    // Handle special window controls
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         spdlog::info("Escape key pressed. Closing the window...");
         glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -83,18 +88,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         return;
     }
 
-    // Update key state
     KeyState::keyStates[key] = (action != GLFW_RELEASE);
 
-    // Get key representation
-    std::string keyStr = std::to_string(key);  // Default to key code
+    std::string keyStr = std::to_string(key);
     auto it = keyMap.find(key);
     if (it != keyMap.end()) {
         bool isShift = mods & GLFW_MOD_SHIFT;
         keyStr = isShift ? it->second.second : it->second.first;
     }
 
-    // Handle key combinations
     if (action == GLFW_PRESS) {
         if (!KeyState::pressedKeys.empty()) {
             KeyState::pressedKeys += " + ";
@@ -102,7 +104,6 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         KeyState::pressedKeys += keyStr;
     }
 
-    // Logging based on mode
     if (mode == debug) {
         spdlog::info("Key {} ({}) {} - Mods: {}{}{}{} - Combined: {}", 
             keyStr, scancode, actionStr,

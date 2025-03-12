@@ -5,4 +5,6 @@
 #define release 0
 int mode = release;
 
+static bool isDragging = false;
+
 #endif /* CONFIG_H */
