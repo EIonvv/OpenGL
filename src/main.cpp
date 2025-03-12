@@ -14,6 +14,11 @@
 #include <fstream>
 #include <base64/base64.h>
 
+// Include Tracy header
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#endif
+
 #include "keyboard/keyboard.h"
 #include "mouse/mouse_callback/mouse_callback.h"
 #include "mouse/mouse_position/get_mouse_position.h"
@@ -118,6 +123,7 @@ static void error_callback(int error, const char *description)
 // Mouse-cube intersection
 bool isPointInCube(glm::vec2 mousePos, const glm::mat4 &mvp, int width, int height)
 {
+    ZoneScoped; // Tracy: Profile this function
     glm::vec4 screenVertices[8];
     for (int i = 0; i < 8; i++)
     {
@@ -161,6 +167,7 @@ bool isPointInCube(glm::vec2 mousePos, const glm::mat4 &mvp, int width, int heig
 // Cube-plane collision
 bool isCubeCollidingWithPlane(const glm::mat4 &model, const Vertex *cubeVertices, const Vertex *planeVertices)
 {
+    ZoneScoped; // Tracy: Profile this function
     std::array<glm::vec3, 8> cubeWorldVertices;
     for (int i = 0; i < 8; i++)
     {
@@ -258,6 +265,7 @@ bool isCubeCollidingWithPlane(const glm::mat4 &model, const Vertex *cubeVertices
 // Initialize GLFW and OpenGL
 GLFWwindow *initializeWindow()
 {
+    ZoneScoped; // Tracy: Profile this function
     glfwSetErrorCallback(error_callback);
     if (!glfwInit())
         exit(EXIT_FAILURE);
@@ -297,6 +305,7 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
                     GLuint &vertex_array, GLuint &vertex_buffer, GLuint &element_buffer,
                     GLuint &planeVertexArray, GLuint &planeVertexBuffer, GLuint &planeElementBuffer)
 {
+    ZoneScoped; // Tracy: Profile this function
     // Cube setup
     glGenBuffers(1, &vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
@@ -412,12 +421,10 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
 // Initialize text renderer
 void initializeTextRenderer()
 {
+    ZoneScoped; // Tracy: Profile this function
     try
     {
-        char bootDrive[MAX_PATH];
-        GetWindowsDirectory(bootDrive, MAX_PATH);
-        std::string bootDriveStr(bootDrive);
-        std::string fontPath = bootDriveStr + "\\Fonts\\ARLRDBD.TTF";
+        std::string fontPath = "resources\\fonts\\arlrbd.ttf";
         spdlog::info("Font path: {}", fontPath);
 
         textRenderer = new TextRenderer(fontPath.c_str(), 32);
@@ -433,6 +440,7 @@ void initializeTextRenderer()
 // Handle input and update cube state
 void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio, double deltaTime)
 {
+    ZoneScoped; // Tracy: Profile this function
     // Camera and cube movement
     float baseSpeed = static_cast<float>(deltaTime) * 12.0f; // Base speed of 12 units per second
     float speed = baseSpeed;                                 // Default speed, adjusted for POV mode if needed
@@ -451,37 +459,6 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         speed = static_cast<float>(deltaTime) * 3.0f;        // Slower speed in POV mode for precision
         SquarePos.y = -0.5f;                                 // Keep cube on the plane (plane at y = -1, cube height = 1)
         cameraPos = SquarePos + glm::vec3(0.0f, 0.5f, 0.0f); // Camera at cube center
-
-        // Gravity and collision
-        SquarePos.y -= 0.1f * static_cast<float>(deltaTime); // Simple gravity
-        if (isCubeCollidingWithPlane(model, vertices, planeVertices))
-        {
-            float lowestY = std::numeric_limits<float>::max();
-            for (int i = 0; i < 8; i++)
-            {
-                glm::vec4 vertex(vertices[i].pos[0], vertices[i].pos[1], vertices[i].pos[2], 1.0f);
-                glm::vec4 worldPos = model * vertex;
-                lowestY = std::min(lowestY, worldPos.y);
-            }
-
-            // if the player is outside the plane, let them fall back onto it by tp'ing them to the plane
-            float planeY = -1.0f;
-
-            if (lowestY < planeY)
-                SquarePos.y += (planeY - lowestY);
-
-            // if the player is inside the plane, let them fall back onto it by tp'ing them to the plane
-            if (lowestY > planeY)
-                SquarePos.y -= (lowestY - planeY);
-
-            // if the player is on the plane, let them stay on the plane
-            if (lowestY == planeY)
-                SquarePos.y = -1.0f;
-
-            // if the player is above the plane, let them fall back onto it by tp'ing them to the plane
-            if (lowestY > planeY)
-                SquarePos.y -= (lowestY - planeY);
-        }
     }
 
     // Use WASD for movement in both modes
@@ -584,11 +561,23 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), ratio, 0.1f, 100.0f);
     mvp = projection * view * model;
 }
+
 // Calculate FPS and enforce frame rate
 void updateFrameTiming(double &previousTime, double &deltaTime)
 {
+    ZoneScoped; // Tracy: Profile this function
     double currentTime = glfwGetTime();
     deltaTime = currentTime - previousTime;
+
+    // Enforce stable frame rate
+    if (deltaTime < targetFrameTime)
+    {
+        double sleepTime = (targetFrameTime - deltaTime) * 1000.0;
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(sleepTime)));
+        currentTime = glfwGetTime();
+        deltaTime = currentTime - previousTime;
+    }
+
     previousTime = currentTime;
 
     // FPS calculation (keep this lightweight)
@@ -602,11 +591,11 @@ void updateFrameTiming(double &previousTime, double &deltaTime)
 }
 
 // Render the scene
-void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint vertex_array, GLuint element_buffer, GLuint planeVertexArray, GLuint planeElementBuffer, const glm::mat4 &model)
+void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint vertex_array, GLuint element_buffer, GLuint planeVertexArray, GLuint planeElementBuffer, const glm::mat4 &model, float ratio)
 {
+    ZoneScoped; // Tracy: Profile this function
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    float ratio = width / (float)height;
     glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -662,7 +651,7 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
         char versionText[64];
         std::string retString = fmt::format("Cube position: ({:.2f}, {:.2f}, {:.2f}) [Rotation: ({:.1f}, {:.1f})]",
                                             SquarePos.x, SquarePos.y, SquarePos.z, rotationAngles.x, rotationAngles.y);
-        snprintf(debugText, sizeof(debugText), retString.c_str());
+        snprintf(debugText, sizeof(debugText), "%s", retString.c_str());
         textRenderer->renderText(debugText, 10.0f, 10.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
         snprintf(versionText, sizeof(versionText), "%s", glGetString(GL_VERSION));
         textRenderer->renderText(versionText, width - 170.0f, height - 30.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
@@ -697,6 +686,7 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
 void cleanup(GLuint program, GLuint vertex_array, GLuint vertex_buffer, GLuint element_buffer,
              GLuint planeVertexArray, GLuint planeVertexBuffer, GLuint planeElementBuffer)
 {
+    ZoneScoped; // Tracy: Profile this function
     glDeleteTextures(1, &planeTexture);
     glDeleteTextures(1, &cubeTexture); // Delete cube texture
     glDeleteVertexArrays(1, &vertex_array);
@@ -713,6 +703,7 @@ void cleanup(GLuint program, GLuint vertex_array, GLuint vertex_buffer, GLuint e
 // Main function
 int main(int argc, char *argv[])
 {
+    ZoneScoped; // Tracy: Profile the main function
     if (argc > 1)
     {
         targetFPS = std::atoi(argv[1]);
@@ -764,6 +755,7 @@ int main(int argc, char *argv[])
 
     while (!glfwWindowShouldClose(window))
     {
+        ZoneScoped; // Tracy: Profile the main loop iteration
         double currentTime = glfwGetTime();
         double deltaTime = currentTime - previousTime;
         if (deltaTime < targetFrameTime)
@@ -780,10 +772,12 @@ int main(int argc, char *argv[])
         glm::mat4 mvp;
         updateCube(window, model, mvp, width, height, ratio, deltaTime);
         renderScene(window, program, mvp_location, vertex_array, element_buffer,
-                    planeVertexArray, planeElementBuffer, model);
+                    planeVertexArray, planeElementBuffer, model, ratio);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        FrameMark; // Tracy: Mark the end of a frame
     }
 
     cleanup(program, vertex_array, vertex_buffer, element_buffer,

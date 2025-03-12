@@ -86,6 +86,24 @@ else()
     message(STATUS "FreeType found on system.")
 endif()
 
+# Tracy (Fetch Tracy from GitHub)
+find_package(Tracy QUIET)
+if (NOT Tracy_FOUND)
+    message(STATUS "Tracy not found, fetching from GitHub...")
+    FetchContent_Declare(
+        tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG v0.11.1  # Use the latest stable version as of your current date (March 2025)
+    )
+    # Configure Tracy options
+    set(TRACY_ENABLE ON CACHE BOOL "Enable Tracy profiling" FORCE)
+    set(TRACY_ON_DEMAND ON CACHE BOOL "Enable on-demand profiling" FORCE)  # Only profiles when the Tracy server is connected
+    set(TRACY_NO_EXIT OFF CACHE BOOL "Do not wait for connection on exit" FORCE)
+    FetchContent_MakeAvailable(tracy)
+else()
+    message(STATUS "Tracy found on system.")
+endif()
+
 # cpp-base64 (header-only library)
 FetchContent_Declare(
     cpp-base64
@@ -115,7 +133,6 @@ add_executable(${PROJECT_NAME}
     src/render/text/text_renderer.cpp
 )
 
-
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     include
@@ -131,6 +148,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     spdlog::spdlog
     freetype
+    Tracy::TracyClient  # Link TracyClient library
     ${CMAKE_DL_LIBS}
 )
 
@@ -140,13 +158,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 # Copy the src/resources/ folder to the output directory after building (optional fallback)
-# if release
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/src/resources"
-    "${CMAKE_BINARY_DIR}/bin/Release/resources"
-    # print the dir it is dumping the resources to
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying resources to ${CMAKE_BINARY_DIR}/bin/Release/resources"
-)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/src/resources"
+        "${CMAKE_BINARY_DIR}/bin/Release/resources"
+        COMMAND ${CMAKE_COMMAND} -E echo "Copying resources to ${CMAKE_BINARY_DIR}/bin/Release/resources"
+    )
 endif()
