@@ -1,0 +1,10 @@
+^C:\USERS\ANDREW\DESKTOP\PROJECTS\C++\3D\BUILD\_DEPS\GLAD-SUBBUILD\CMAKEFILES\65002B867E6D5F9065CE75E0D5767780\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild -BC:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/glad-populate.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

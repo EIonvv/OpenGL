@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/glad-populate"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/65002b867e6d5f9065ce75e0d5767780/glad-populate.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/2b6a18720b9a68f72b010a188179071e/glad-populate-complete.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-build.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-configure.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-download.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-install.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-patch.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-test.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/6bcfd0c087a8d1af21256c2fdadd26d4/glad-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"glad-populate"
+		],
+		"name" : "glad-populate"
+	}
+}

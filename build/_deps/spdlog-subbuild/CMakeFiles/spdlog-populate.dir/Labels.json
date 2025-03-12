@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/spdlog-populate"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/15128869a2ab086aeca97bda447ec4f0/spdlog-populate.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/58629816f957c9d23c989272c86b3a71/spdlog-populate-complete.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-build.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-configure.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-download.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-install.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-patch.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-test.rule"
+		},
+		{
+			"file" : "C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/spdlog-subbuild/CMakeFiles/ab169f812a49d552634f432fa6dc9c0d/spdlog-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"spdlog-populate"
+		],
+		"name" : "spdlog-populate"
+	}
+}

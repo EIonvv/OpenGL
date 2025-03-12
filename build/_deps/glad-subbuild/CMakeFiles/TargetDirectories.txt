@@ -1,0 +1,3 @@
+C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/glad-populate.dir
+C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/ALL_BUILD.dir
+C:/Users/Andrew/Desktop/Projects/C++/3D/build/_deps/glad-subbuild/CMakeFiles/ZERO_CHECK.dir
