@@ -1,8 +1,5 @@
 #include "text_renderer.h"
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <stdexcept>
-#include <GLFW/glfw3.h>
+
 
 static const char *vertexShaderSource = R"(
 #version 330 core

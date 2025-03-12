@@ -9,6 +9,11 @@
 #include <map>
 #include <string>
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <stdexcept>
+#include <GLFW/glfw3.h>
+
 class TextRenderer
 {
 public:

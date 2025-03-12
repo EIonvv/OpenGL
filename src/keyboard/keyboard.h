@@ -122,44 +122,22 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         return;
     }
 
-    if (key == GLFW_KEY_W && action == GLFW_PRESS)
+    switch (key)
     {
-        pressing_w = true;
-    }
-
-    if (key == GLFW_KEY_W && action == GLFW_RELEASE)
-    {
-        pressing_w = false;
-    }
-
-    if (key == GLFW_KEY_S && action == GLFW_PRESS)
-    {
-        pressing_s = true;
-    }
-
-    if (key == GLFW_KEY_S && action == GLFW_RELEASE)
-    {
-        pressing_s = false;
-    }
-
-    if (key == GLFW_KEY_A && action == GLFW_PRESS)
-    {
-        pressing_a = true;
-    }
-
-    if (key == GLFW_KEY_A && action == GLFW_RELEASE)
-    {
-        pressing_a = false;
-    }
-
-    if (key == GLFW_KEY_D && action == GLFW_PRESS)
-    {
-        pressing_d = true;
-    }
-
-    if (key == GLFW_KEY_D && action == GLFW_RELEASE)
-    {
-        pressing_d = false;
+    case GLFW_KEY_W:
+        pressing_w = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_S:
+        pressing_s = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_A:
+        pressing_a = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_D:
+        pressing_d = (action != GLFW_RELEASE);
+        break;
+    default:
+        break;
     }
 
     if (key == GLFW_KEY_F1 && action == GLFW_PRESS)

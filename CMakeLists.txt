@@ -19,6 +19,9 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 # Enable FetchContent
 include(FetchContent)
 
+# Find Python3 for resource generation
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 # GLFW
 find_package(glfw3 QUIET)
 if (NOT glfw3_FOUND)
@@ -83,14 +86,28 @@ else()
     message(STATUS "FreeType found on system.")
 endif()
 
+# cpp-base64 (header-only library)
+FetchContent_Declare(
+    cpp-base64
+    GIT_REPOSITORY https://github.com/ReneNyffenegger/cpp-base64.git
+    GIT_TAG master
+)
+FetchContent_GetProperties(cpp-base64)
+if(NOT cpp-base64_POPULATED)
+    FetchContent_Populate(cpp-base64)
+    add_library(cpp-base64 INTERFACE)
+    target_include_directories(cpp-base64 INTERFACE ${cpp-base64_SOURCE_DIR})
+endif()
+
 # Add GLAD source files
 set(GLAD_DIR ${CMAKE_SOURCE_DIR}/include/glad)
 add_library(glad STATIC
     include/src/glad.c
 )
-
-# Include directories for GLAD
 target_include_directories(glad PUBLIC ${GLAD_DIR})
+
+# Ensure the include directory exists
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include)
 
 # Add your source files
 add_executable(${PROJECT_NAME}
@@ -98,10 +115,13 @@ add_executable(${PROJECT_NAME}
     src/render/text/text_renderer.cpp
 )
 
+
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     include
+    ${CMAKE_BINARY_DIR}/include  # Include the directory with resources.h
     ${GLAD_DIR}
+    ${cpp-base64_SOURCE_DIR}
 )
 
 # Link libraries
@@ -118,3 +138,14 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+# Copy the src/resources/ folder to the output directory after building (optional fallback)
+# if release
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/src/resources"
+    "${CMAKE_BINARY_DIR}/bin/Release/resources"
+    COMMENT "Copying resources folder to output directory"
+)
+endif()
