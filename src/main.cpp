@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
-#include <base64/base64.h> // You'll need a base64 decoding library (e.g., from https://github.com/ReneNyffenegger/cpp-base64)
+#include <base64/base64.h>
 
 #include "keyboard/keyboard.h"
 #include "mouse/mouse_callback/mouse_callback.h"
@@ -34,41 +34,44 @@
 // Global variables
 static glm::vec3 SquarePos(0.0f);
 static glm::vec2 lastMousePos(0.0f);
-static glm::vec3 rotationAngles(0.0f);
 static double lastTime = 0.0;
 static int frameCount = 0;
 static double currentFPS = 0.0;
 static TextRenderer *textRenderer = nullptr;
-static GLuint planeTexture;
+static GLuint planeTexture; // Plane texture
+static GLuint cubeTexture;  // Cube texture
 static GLint textureLocation;
-static glm::vec3 cameraPos = glm::vec3(0.0f, -1.0f, 3.0f); // Start on the plane
 
-// Cube data
+// Start at the plane just in front of the cube
+static glm::vec3 cameraPos = glm::vec3(-3.0f, 0.0f, 0.0f);
+
+// Cube data with updated texture coordinates
 static const Vertex vertices[8] = {
-    {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-    {{-0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-    {{-0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}};
+    {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},  // 0: Front bottom-left (Bottom face: bottom-left)
+    {{0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},   // 1: Front bottom-right (Bottom face: bottom-right)
+    {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},    // 2: Front top-right (Top face: top-right)
+    {{-0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},   // 3: Front top-left (Top face: top-left)
+    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 4: Back bottom-left (Bottom face: top-left)
+    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},  // 5: Back bottom-right (Bottom face: top-right)
+    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   // 6: Back top-right (Top face: bottom-right)
+    {{-0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},  // 7: Back top-left (Top face: bottom-left)
+};
 
 static const GLuint indices[36] = {
     0, 1, 2, 2, 3, 0, 1, 5, 6, 6, 2, 1,
     5, 4, 7, 7, 6, 5, 4, 0, 3, 3, 7, 4,
     3, 2, 6, 6, 7, 3, 0, 4, 5, 5, 1, 0};
 
-// Plane data
+// Plane data (increased size to 10x10)
 static const Vertex planeVertices[4] = {
-    {{-1.0f, 0.0f, -1.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
-    {{1.0f, 0.0f, -1.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
-    {{1.0f, 0.0f, 1.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
-    {{-1.0f, 0.0f, 1.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}};
+    {{-5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
+    {{-5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}};
 
 static const GLuint planeIndices[6] = {0, 1, 2, 2, 3, 0};
 
-// Shaders
+// Shaders (modified fragment shader to use a fallback color if texture fails)
 static const char *vertex_shader_text =
     "#version 330\n"
     "uniform mat4 MVP;\n"
@@ -94,7 +97,12 @@ static const char *fragment_shader_text =
     "void main()\n"
     "{\n"
     "    if (useTexture == 1) {\n"
-    "        fragment = texture(textureSampler, texCoord);\n"
+    "        vec4 texColor = texture(textureSampler, texCoord);\n"
+    "        if (texColor.a < 0.1) {\n"
+    "            fragment = vec4(0.5, 0.5, 0.5, 1.0); // Fallback color (gray)\n"
+    "        } else {\n"
+    "            fragment = texColor;\n"
+    "        }\n"
     "    } else {\n"
     "        fragment = vec4(color, 1.0);\n"
     "    }\n"
@@ -167,6 +175,14 @@ bool isCubeCollidingWithPlane(const glm::mat4 &model, const Vertex *cubeVertices
         glm::vec4 vertex(planeVertices[i].pos[0], planeVertices[i].pos[1], planeVertices[i].pos[2], 1.0f);
         glm::vec4 worldPos = planeModel * vertex;
         planeWorldVertices[i] = glm::vec3(worldPos.x, worldPos.y, worldPos.z);
+    }
+
+    if (mode == debug)
+    {
+        // spdlog::info("Plane vertices (world space):");
+        // for (int i = 0; i < 4; i++) {
+        //     spdlog::info("Vertex {}: ({:.2f}, {:.2f}, {:.2f})", i, planeWorldVertices[i].x, planeWorldVertices[i].y, planeWorldVertices[i].z);
+        // }
     }
 
     glm::vec3 edge1 = planeWorldVertices[1] - planeWorldVertices[0];
@@ -261,6 +277,7 @@ GLFWwindow *initializeWindow()
     glfwMakeContextCurrent(window);
     glfwSetKeyCallback(window, key_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, mouse_callback); // Add mouse movement callback
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -279,7 +296,6 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
                     GLuint &vertex_array, GLuint &vertex_buffer, GLuint &element_buffer,
                     GLuint &planeVertexArray, GLuint &planeVertexBuffer, GLuint &planeElementBuffer)
 {
-
     // Cube setup
     glGenBuffers(1, &vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
@@ -303,14 +319,39 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
     glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
     glCompileShader(vertex_shader);
 
+    GLint success;
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetShaderInfoLog(vertex_shader, 512, NULL, infoLog);
+        spdlog::error("Vertex shader compilation failed: {}", infoLog);
+    }
+
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
     glCompileShader(fragment_shader);
+
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetShaderInfoLog(fragment_shader, 512, NULL, infoLog);
+        spdlog::error("Fragment shader compilation failed: {}", infoLog);
+    }
 
     program = glCreateProgram();
     glAttachShader(program, vertex_shader);
     glAttachShader(program, fragment_shader);
     glLinkProgram(program);
+
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, NULL, infoLog);
+        spdlog::error("Shader program linking failed: {}", infoLog);
+    }
 
     mvp_location = glGetUniformLocation(program, "MVP");
     vpos_location = glGetAttribLocation(program, "vPos");
@@ -327,7 +368,9 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
     glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
     glEnableVertexAttribArray(vcol_location);
     glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, col));
-    glDisableVertexAttribArray(vtex_location); // Cube doesn't use texture
+    // Enable texture coordinates for the cube
+    glEnableVertexAttribArray(vtex_location);
+    glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
     // Plane VAO
     glGenVertexArrays(1, &planeVertexArray);
@@ -341,8 +384,28 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
     // Load texture
-    std::string texturePath = "resources/textures/wood.jpg";
-    loadTexture(texturePath.c_str(), planeTexture);
+    std::string woodTexturePath = "resources/textures/wood.jpg";
+    loadTexture(woodTexturePath.c_str(), planeTexture);
+    if (planeTexture == 0)
+    {
+        spdlog::error("Failed to load plane texture: {}", woodTexturePath);
+    }
+    else
+    {
+        spdlog::info("Plane texture loaded successfully: {}", woodTexturePath);
+    }
+
+    // Load cube texture
+    std::string cubeTexturePath = "resources/textures/concrete.jpg";
+    loadTexture(cubeTexturePath.c_str(), cubeTexture);
+    if (cubeTexture == 0)
+    {
+        spdlog::error("Failed to load cube texture: {}", cubeTexturePath);
+    }
+    else
+    {
+        spdlog::info("Cube texture loaded successfully: {}", cubeTexturePath);
+    }
 }
 
 // Initialize text renderer
@@ -369,102 +432,83 @@ void initializeTextRenderer()
 // Handle input and update cube state
 void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio)
 {
+    // Camera movement
+    float speed = 0.05f;
+    glm::vec3 direction;
+    direction.x = cos(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
+    direction.y = sin(glm::radians(rotationAngles.x)); // Pitch affects vertical look
+    direction.z = sin(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
+    direction = glm::normalize(direction);
+
+    glm::vec3 right = glm::normalize(glm::cross(direction, glm::vec3(0.0f, 1.0f, 0.0f)));
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f); // Ensure up vector is consistent
+
+    if (pressing_w)
+        cameraPos += direction * speed; // Move forward
+    if (pressing_s)
+        cameraPos -= direction * speed; // Move backward
+    if (pressing_a)
+        cameraPos -= right * speed; // Move left
+    if (pressing_d)
+        cameraPos += right * speed; // Move right
+
+    // Handle arrow keys for moving the cube
+    if (pressing_up)
+        SquarePos.z -= speed; // Move cube forward
+    if (pressing_down)
+        SquarePos.z += speed; // Move cube backward
+    if (pressing_left)
+        SquarePos.x -= speed; // Move cube left
+    if (pressing_right)
+        SquarePos.x += speed; // Move cube right
+
+    // Allow camera to move vertically for better visibility
+    // Removed: cameraPos.y = -1.0f;
+
+    // Cube movement (optional, can be removed if not needed)
     glm::vec2 mousePos = GetMouse::getMousePosition(window);
     bool isMouseOverCube = isPointInCube(mousePos, mvp, width, height);
-
-    float rotationSpeed = 1.0f;
-    if (KeyState::keyStates[GLFW_KEY_UP])
-        rotationAngles.x += rotationSpeed;
-    if (KeyState::keyStates[GLFW_KEY_DOWN])
-        rotationAngles.x -= rotationSpeed;
-    if (KeyState::keyStates[GLFW_KEY_LEFT])
-        rotationAngles.y += rotationSpeed;
-    if (KeyState::keyStates[GLFW_KEY_RIGHT])
-        rotationAngles.y -= rotationSpeed;
 
     if (isDragging && isMouseOverCube)
     {
         glm::vec2 delta = mousePos - lastMousePos;
         SquarePos.x += delta.x * 0.002f;
-        SquarePos.y -= delta.y * glm::clamp(0.002f * ratio, 0.002f, 0.01f);
+        SquarePos.z -= delta.y * glm::clamp(0.002f * ratio, 0.002f, 0.01f); // Changed to z to match plane orientation
         if (mode == debug)
-            spdlog::info("Cube position: ({}, {})", SquarePos.x, SquarePos.y);
+            spdlog::info("Cube position: ({}, {}, {})", SquarePos.x, SquarePos.y, SquarePos.z);
     }
     lastMousePos = mousePos;
-
-    glm::vec3 direction;
-    direction.x = cos(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
-    direction.y = sin(glm::radians(rotationAngles.x));
-    direction.z = sin(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
-    direction = glm::normalize(direction);
-
-    glm::vec3 right = glm::normalize(glm::cross(direction, glm::vec3(0.0f, 1.0f, 0.0f)));
-    glm::vec3 up = glm::normalize(glm::cross(right, direction));
-
-    float speed = 0.05f;
-    if (pressing_w)
-        SquarePos -= right * speed;
-    if (pressing_s)
-        SquarePos += right * speed;
-    if (pressing_a)
-        SquarePos -= direction * speed;
-    if (pressing_d)
-        SquarePos += direction * speed;
 
     model = glm::translate(glm::mat4(1.0f), SquarePos);
     model = glm::rotate(model, glm::radians(rotationAngles.x), glm::vec3(1.0f, 0.0f, 0.0f));
     model = glm::rotate(model, glm::radians(rotationAngles.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    // model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
-
-    if (mode == debug)
+    if (mode == release)
     {
-        // rotate cube around its center
         model = glm::translate(model, glm::mat3(model) * glm::vec3(0.0f, 0.0f, 0.0f));
         model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
     }
 
+    // Update view matrix with camera
     glm::mat4 view = glm::lookAt(cameraPos, cameraPos + direction, up);
+
+    // Update MVP matrix
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), ratio, 0.1f, 100.0f);
     mvp = projection * view * model;
 }
 
 // Calculate FPS and enforce frame rate
-void updateFrameTiming(double currentTime, double &previousTime, double &deltaTime)
-{
-    currentTime = glfwGetTime();
+void updateFrameTiming(double& previousTime, double& deltaTime) {
+    double currentTime = glfwGetTime();
     deltaTime = currentTime - previousTime;
+    previousTime = currentTime;
 
+    // FPS calculation (keep this lightweight)
     frameCount++;
-    if (currentTime - lastTime >= 1.0)
-    {
+    if (currentTime - lastTime >= 1.0) {
         currentFPS = frameCount / (currentTime - lastTime);
         frameCount = 0;
         lastTime = currentTime;
     }
-
-    if (deltaTime < targetFrameTime)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((targetFrameTime - deltaTime) * 1000)));
-        currentTime = glfwGetTime();
-        deltaTime = currentTime - previousTime;
-
-        frameCount++;
-        if (currentTime - lastTime >= 1.0)
-        {
-            currentFPS = frameCount / (currentTime - lastTime);
-            frameCount = 0;
-            lastTime = currentTime;
-        }
-
-        if (currentFPS > targetFPS)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((1.0 / targetFPS - deltaTime) * 1000)));
-            currentTime = glfwGetTime();
-            deltaTime = currentTime - previousTime;
-        }
-    }
-
-    previousTime = currentTime;
 }
 
 // Render scene
@@ -476,15 +520,25 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
     glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    // Use camera-based view
+    glm::vec3 direction;
+    direction.x = cos(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
+    direction.y = sin(glm::radians(rotationAngles.x));
+    direction.z = sin(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
+    direction = glm::normalize(direction);
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f); // Up vector (assuming plane is horizontal)
+    // Face the view towards the cube
+    glm::mat4 view = glm::lookAt(cameraPos - direction, cameraPos, up);
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), ratio, 0.1f, 100.0f);
-    glm::mat4 mvp = projection * view * model;
+    glm::mat4 cubeMVP = projection * view * model;
 
     glUseProgram(program);
-
-    // Render cube (use colors, no texture)
-    glUniform1i(glGetUniformLocation(program, "useTexture"), 0);
-    glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
+    // Render cube (use texture)
+    glUniform1i(glGetUniformLocation(program, "useTexture"), 1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, cubeTexture); // Bind the cube's texture
+    glUniform1i(textureLocation, 0);
+    glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(cubeMVP));
     glBindVertexArray(vertex_array);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
     glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
@@ -501,11 +555,19 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planeElementBuffer);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+    // Debug: Check if plane is being rendered
+    if (mode == debug)
+    {
+        GLint viewport[4];
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        // spdlog::info("Viewport: ({}, {}, {}, {})", viewport[0], viewport[1], viewport[2], viewport[3]);
+    }
+
     // Render text
     glDisable(GL_DEPTH_TEST);
     bool isColliding = isCubeCollidingWithPlane(model, vertices, planeVertices);
     glm::vec2 mousePos = GetMouse::getMousePosition(window);
-    bool isMouseOverCube = isPointInCube(mousePos, mvp, width, height);
+    bool isMouseOverCube = isPointInCube(mousePos, cubeMVP, width, height);
 
     if (renderDebugText)
     {
@@ -516,7 +578,6 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
         snprintf(debugText, sizeof(debugText), retString.c_str());
         textRenderer->renderText(debugText, 10.0f, 10.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
         snprintf(versionText, sizeof(versionText), "%s", glGetString(GL_VERSION));
-        // display on the top right corner
         textRenderer->renderText(versionText, width - 170.0f, height - 30.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
     }
 
@@ -526,7 +587,6 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
         snprintf(cursorText, sizeof(cursorText), "Cursor position: (%.2f, %.2f)", mousePos.x, mousePos.y);
         textRenderer->renderText(cursorText, 10.0f, 50.0f, 0.5f, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        // make the square go down when the mouse is over it
         if (!isDragging)
         {
             SquarePos.y -= 0.01f;
@@ -567,6 +627,7 @@ void cleanup(GLuint program, GLuint vertex_array, GLuint vertex_buffer, GLuint e
              GLuint planeVertexArray, GLuint planeVertexBuffer, GLuint planeElementBuffer)
 {
     glDeleteTextures(1, &planeTexture);
+    glDeleteTextures(1, &cubeTexture); // Delete cube texture
     glDeleteVertexArrays(1, &vertex_array);
     glDeleteBuffers(1, &vertex_buffer);
     glDeleteBuffers(1, &element_buffer);
@@ -581,7 +642,6 @@ void cleanup(GLuint program, GLuint vertex_array, GLuint vertex_buffer, GLuint e
 // Main function
 int main(int argc, char *argv[])
 {
-
     if (argc > 1)
     {
         targetFPS = std::atoi(argv[1]);
@@ -596,13 +656,17 @@ int main(int argc, char *argv[])
 
     if (argc > 2)
     {
-        if (std::string(argv[2]) == "debug")
+        if (std::string(argv[2]) == "debug" ? mode = debug : mode = release)
+            spdlog::info("Mode: {}", mode);
+        if (mode == release)
         {
-            mode = debug;
-            renderDebugText = true;
-            spdlog::info("Debug mode enabled");
+            spdlog::set_level(spdlog::level::info);
         }
     }
+
+    // Set initial rotation to look downward at the plane
+    rotationAngles.x = 45.0f; // Pitch down 45 degrees to see the plane
+    rotationAngles.y = 0.0f;  // Yaw straight ahead
 
     GLFWwindow *window = initializeWindow();
 
@@ -629,8 +693,14 @@ int main(int argc, char *argv[])
 
     while (!glfwWindowShouldClose(window))
     {
-        double currentTime = 0.0, deltaTime;
-        updateFrameTiming(currentTime, previousTime, deltaTime);
+        double currentTime = glfwGetTime();
+        double deltaTime = currentTime - previousTime;
+        if (deltaTime < targetFrameTime)
+        {
+            double sleepTime = (targetFrameTime - deltaTime) * 1000.0;
+            std::this_thread::sleep_for(std::chrono::milliseconds((int)sleepTime));
+        }
+        updateFrameTiming(previousTime, deltaTime);
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);

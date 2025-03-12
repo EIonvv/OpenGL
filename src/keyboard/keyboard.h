@@ -15,6 +15,11 @@ static bool pressing_s = false;      // Flag to control walking backward
 static bool pressing_a = false;      // Flag to control walking left
 static bool pressing_d = false;      // Flag to control walking right
 
+static bool pressing_up = false;    // Flag to control looking up
+static bool pressing_down = false;  // Flag to control looking down
+static bool pressing_left = false;  // Flag to control looking left
+static bool pressing_right = false; // Flag to control looking right
+
 // Key state tracking structure
 struct KeyState
 {
@@ -135,6 +140,19 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         break;
     case GLFW_KEY_D:
         pressing_d = (action != GLFW_RELEASE);
+        break;
+    // arrow keys
+    case GLFW_KEY_UP:
+        pressing_up = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_DOWN:
+        pressing_down = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_LEFT:
+        pressing_left = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_RIGHT:
+        pressing_right = (action != GLFW_RELEASE);
         break;
     default:
         break;
