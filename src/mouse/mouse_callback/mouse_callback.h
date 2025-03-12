@@ -6,7 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
 
-#include "../config.h"
+#include "../../config.h"
 
 static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 {

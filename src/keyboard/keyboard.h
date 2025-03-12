@@ -83,19 +83,6 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
         mode = (mode == debug) ? release : debug;
         spdlog::info("Switching to {} mode", (mode == debug) ? "debug" : "release");
-        // display the console in debug mode
-        if (mode == debug) {
-            FreeConsole();
-            AllocConsole();
-            FILE* file = nullptr;
-            freopen_s(&file, "CONOUT$", "w", stdout);
-            SetConsoleTitle("Debug Console");
-            spdlog::info("Debug console initialized");
-        }
-        else if (mode == release) {
-            // close the console
-            FreeConsole();
-        }
         KeyState::pressedKeys.clear();
         KeyState::keyStates.clear();
         return;
@@ -130,14 +117,14 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
             KeyState::pressedKeys.clear();
         }
     }
-    else if (mode == release) {
-        spdlog::info("Key {} {} - Combined: {}", 
-            keyStr, actionStr, KeyState::pressedKeys);
+    // else if (mode == release) {
+    //     spdlog::info("Key {} {} - Combined: {}", 
+    //         keyStr, actionStr, KeyState::pressedKeys);
         
-        if (action == GLFW_RELEASE) {
-            KeyState::pressedKeys.clear();
-        }
-    }
+    //     if (action == GLFW_RELEASE) {
+    //         KeyState::pressedKeys.clear();
+    //     }
+    // }
 }
 
 #endif /* KEYBOARD_H */

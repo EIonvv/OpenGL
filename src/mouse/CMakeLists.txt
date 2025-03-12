@@ -1,5 +1,2 @@
-target_sources(
-    ${PROJECT_NAME}
-    PRIVATE
-    getMouse.h
-)
+add_subdirectory(mouse_callback)
+add_subdirectory(mouse_position)

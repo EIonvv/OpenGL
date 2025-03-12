@@ -1,5 +1,6 @@
-#ifndef GETMOUSE_H
-#define GETMOUSE_H
+#ifndef GET_MOUSE_POSITION_H
+#define GET_MOUSE_POSITION_H
+
 
 #include <iostream>
 #include <windows.h>
@@ -18,4 +19,5 @@ public:
     }
 };
 
-#endif /* GETMOUSE_H */
+
+#endif /* GET_MOUSE_POSITION_H */

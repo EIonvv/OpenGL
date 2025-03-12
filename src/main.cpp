@@ -7,22 +7,19 @@
 #include <string>
 #include <thread>
 #include <chrono>
-
-#include "mouse/getMouse.h"
-#include "mouse/mouse_callback.h"
-#include "keyboard/keyboard.h"
-#include "config.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/msvc_sink.h>
 
-const int TARGET_FPS = 144;
-const double TARGET_FRAME_TIME = 1.0 / TARGET_FPS;
+#include "keyboard/keyboard.h"
+#include "mouse/mouse_callback/mouse_callback.h"
+#include "mouse/mouse_position/get_mouse_position.h"
+#include "render/vertex/vertex.h"
 
-typedef struct Vertex
-{
-    glm::vec3 pos;
-    glm::vec3 col;
-} Vertex;
+#include "config.h"
+
+// Initial target FPS (can be overridden by command-line argument)
+static int targetFPS = 144;
+static double targetFrameTime = 1.0 / targetFPS;
 
 // Cube vertices
 static const Vertex vertices[8] = {
@@ -76,17 +73,23 @@ static double currentFPS = 0.0;
 
 void displayFPS(GLFWwindow* window) {
     char title[64];
-    snprintf(title, sizeof(title), "3D Draggable Cube - FPS: %.1f", currentFPS);
+    snprintf(title, sizeof(title), "3D Draggable Cube - Target: %d, FPS: %.1f", targetFPS, currentFPS);
     glfwSetWindowTitle(window, title);
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-    glfwSetErrorCallback(error_callback);
+    // Override default FPS with command-line argument if provided
+    if (argc > 1) {
+        targetFPS = std::atoi(argv[1]);
+        if (targetFPS <= 0) {
+            spdlog::warn("Invalid FPS value provided. Using default: 144");
+            targetFPS = 144;
+        }
+        targetFrameTime = 1.0 / targetFPS;
+    }
 
-    // hide the console if in release mode
-    if (mode == release)
-        FreeConsole();
+    glfwSetErrorCallback(error_callback);
 
     if (!glfwInit())
         exit(EXIT_FAILURE);
@@ -114,7 +117,7 @@ int main()
         return -1;
     }
 
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
     glEnable(GL_DEPTH_TEST);
 
     // Setup cube
@@ -166,9 +169,9 @@ int main()
             lastTime = currentTime;
         }
 
-        if (deltaTime < TARGET_FRAME_TIME) {
-            double sleepTime = (TARGET_FRAME_TIME - deltaTime) * 1000.0;
-            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(sleepTime)));
+        // Frame limiting to target FPS
+        if (deltaTime < targetFrameTime) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((targetFrameTime - deltaTime) * 1000)));
             currentTime = glfwGetTime();
             deltaTime = currentTime - previousTime;
         }
@@ -178,6 +181,7 @@ int main()
         float ratio = width / (float)height;
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         // Handle mouse dragging
         glm::vec2 mousePos = GetMouse::getMousePosition(window);
         if (isDragging)
