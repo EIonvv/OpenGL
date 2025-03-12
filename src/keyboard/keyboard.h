@@ -6,19 +6,22 @@
 #include <GLFW/glfw3.h>
 #include <unordered_map>
 #include "../render/text/text_renderer.h"
-
 #include "../config.h"
+
+// Declare external variables
+extern bool cubePOVMode; // Add this to access cubePOVMode from main.cpp
+
 static TextRenderer *keyboardTextRenderer = nullptr;
 static bool renderDebugText = false; // Flag to control debug text rendering
 static bool pressing_w = false;      // Flag to control walking forward
 static bool pressing_s = false;      // Flag to control walking backward
 static bool pressing_a = false;      // Flag to control walking left
 static bool pressing_d = false;      // Flag to control walking right
-
-static bool pressing_up = false;    // Flag to control looking up
-static bool pressing_down = false;  // Flag to control looking down
-static bool pressing_left = false;  // Flag to control looking left
-static bool pressing_right = false; // Flag to control looking right
+static bool pressing_v = false;      // Flag to control cube POV mode toggle
+static bool pressing_up = false;     // Flag to control looking up
+static bool pressing_down = false;   // Flag to control looking down
+static bool pressing_left = false;   // Flag to control looking left
+static bool pressing_right = false;  // Flag to control looking right
 
 // Key state tracking structure
 struct KeyState
@@ -109,10 +112,9 @@ static const std::unordered_map<int, std::pair<std::string, std::string>> keyMap
     {GLFW_KEY_DOWN, {"[DOWN]", "[DOWN]"}},
     {GLFW_KEY_LEFT, {"[LEFT]", "[LEFT]"}},
     {GLFW_KEY_RIGHT, {"[RIGHT]", "[RIGHT]"}}
-
 };
 
-// key_callback remains unchanged
+// Updated key_callback with cubePOVMode toggle
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     const char *actionStr = (action == GLFW_PRESS) ? "pressed" : (action == GLFW_RELEASE) ? "released"
@@ -126,6 +128,15 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         KeyState::keyStates.clear();
         return;
     }
+
+    // Toggle cube POV mode when 'V' is pressed
+    static bool vPressedLastFrame = false;
+    if (key == GLFW_KEY_V && action == GLFW_PRESS && !vPressedLastFrame)
+    {
+        cubePOVMode = !cubePOVMode;
+        spdlog::info("Switched to {} mode", cubePOVMode ? "Cube POV" : "Normal");
+    }
+    vPressedLastFrame = (key == GLFW_KEY_V && action != GLFW_RELEASE);
 
     switch (key)
     {
@@ -141,7 +152,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
     case GLFW_KEY_D:
         pressing_d = (action != GLFW_RELEASE);
         break;
-    // arrow keys
+    // Arrow keys
     case GLFW_KEY_UP:
         pressing_up = (action != GLFW_RELEASE);
         break;
