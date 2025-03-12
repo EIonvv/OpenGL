@@ -1,2 +1,3 @@
-# 3D
+# OpenGL
+
  Test OpenGL Project
