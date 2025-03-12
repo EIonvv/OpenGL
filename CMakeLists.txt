@@ -53,6 +53,20 @@ else()
     message(STATUS "spdlog found on system.")
 endif()
 
+# nlohmann_json
+find_package(nlohmann_json QUIET)
+if (NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json not found, fetching from GitHub...")
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.9.1  # Specify a stable release
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+else()
+    message(STATUS "nlohmann_json found on system.")
+endif()
+
 # Add GLAD source files
 set(GLAD_DIR ${CMAKE_SOURCE_DIR}/include/glad)  # Adjust path if different
 add_library(glad STATIC
@@ -64,7 +78,6 @@ target_include_directories(glad PUBLIC ${GLAD_DIR})
 # Add your source files
 add_executable(${PROJECT_NAME}
     src/main.cpp
-    # Add more source files here as needed
 )
 
 # Include directories
@@ -79,6 +92,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw      # Link the GLFW library (correct target name)
     glm::glm  # GLM as a CMake target
     spdlog::spdlog  # spdlog as a CMake target
+    nlohmann_json::nlohmann_json  # nlohmann_json as a CMake target
     ${CMAKE_DL_LIBS}  # For dlopen/dlclose on Unix systems (empty on Windows)
 )
 
