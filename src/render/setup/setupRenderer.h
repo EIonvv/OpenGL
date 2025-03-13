@@ -13,8 +13,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <tracy/Tracy.hpp>
-#include <tracy/TracyOpenGL.hpp>
 
 static GLuint planeTexture; // Plane texture
 static GLuint cubeTexture;  // Cube texture
@@ -90,7 +88,6 @@ static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_loc
                     GLuint &vertex_array, GLuint &vertex_buffer, GLuint &element_buffer,
                     GLuint &planeVertexArray, GLuint &planeVertexBuffer, GLuint &planeElementBuffer)
 {
-    ZoneScoped; // Tracy: Profile this function
     // Cube setup
     glGenBuffers(1, &vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
@@ -206,7 +203,6 @@ static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_loc
 // Initialize text renderer
 static void initializeTextRenderer(TextRenderer *&textRenderer)
 {
-    ZoneScoped; // Tracy: Profile this function
     try
     {
         std::string fontPath = "resources\\fonts\\arlrbd.ttf";

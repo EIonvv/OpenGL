@@ -86,24 +86,6 @@ else()
     message(STATUS "FreeType found on system.")
 endif()
 
-# Tracy (Fetch Tracy from GitHub)
-find_package(Tracy QUIET)
-if (NOT Tracy_FOUND)
-    message(STATUS "Tracy not found, fetching from GitHub...")
-    FetchContent_Declare(
-        tracy
-        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-        GIT_TAG v0.11.1  # Use the latest stable version as of your current date (March 2025)
-    )
-    # Configure Tracy options
-    set(TRACY_ENABLE ON CACHE BOOL "Enable Tracy profiling" FORCE)
-    set(TRACY_ON_DEMAND ON CACHE BOOL "Enable on-demand profiling" FORCE)  # Only profiles when the Tracy server is connected
-    set(TRACY_NO_EXIT OFF CACHE BOOL "Do not wait for connection on exit" FORCE)
-    FetchContent_MakeAvailable(tracy)
-else()
-    message(STATUS "Tracy found on system.")
-endif()
-
 # cpp-base64 (header-only library)
 FetchContent_Declare(
     cpp-base64
@@ -148,7 +130,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     spdlog::spdlog
     freetype
-    Tracy::TracyClient  # Link TracyClient library
     ${CMAKE_DL_LIBS}
 )
 
