@@ -280,9 +280,15 @@ GLFWwindow *initializeWindow()
 {
     ZoneScoped; // Tracy: Profile this function
 
-    glfwSetErrorCallback(error_callback);
+    glfwSetErrorCallback([](int error, const char *description)
+                         { spdlog::error("GLFW Error {}: {}", error, description); });
+
     if (!glfwInit())
-        exit(EXIT_FAILURE);
+    {
+        spdlog::critical("Failed to initialize GLFW. Terminating program.");
+        glfwTerminate();    // Ensure GLFW is terminated even on failure
+        exit(EXIT_FAILURE); // Exit with failure code
+    }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -291,7 +297,7 @@ GLFWwindow *initializeWindow()
     GLFWwindow *window = glfwCreateWindow(800, 600, "3D Draggable Cube", NULL, NULL);
     if (!window)
     {
-        spdlog::error("Failed to create GLFW window");
+        spdlog::error("Failed to create GLFW window. Possible reasons include lack of OpenGL context or incompatible hardware.");
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
@@ -305,6 +311,7 @@ GLFWwindow *initializeWindow()
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         spdlog::error("Failed to initialize GLAD");
+        glfwDestroyWindow(window); // Clean up window before terminating
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
@@ -312,6 +319,8 @@ GLFWwindow *initializeWindow()
     glEnable(GL_BLEND);
     glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
+
+    spdlog::info("GLFW and OpenGL initialized successfully.");
     return window;
 }
 
@@ -766,6 +775,7 @@ int main(int argc, char *argv[])
     double accumulator = 0.0;
     const double fixedDeltaTime = 1.0 / 60.0f;
 
+
     while (!glfwWindowShouldClose(window))
     {
         ZoneScoped; // Tracy: Profile this frame
@@ -805,23 +815,6 @@ int main(int argc, char *argv[])
             renderImGui();
         }
 
-        // if exitmode is true then exit the program
-        if (exitFlag)
-        {
-            // Cleanup
-            cleanup(program, cubeVAO, cubeVBO, cubeEBO, planes);
-
-            ImGui_ImplOpenGL3_Shutdown();
-            ImGui_ImplGlfw_Shutdown();
-            ImGui::DestroyContext();
-            glDeleteShader(vertex_shader);
-            glDeleteShader(fragment_shader);
-
-            glfwDestroyWindow(window);
-            glfwTerminate();
-            return 0;
-        }
-
         glEnable(GL_DEPTH_TEST); // Re-enable depth test for next frame
 
         // Swap buffers and poll events
@@ -839,6 +832,11 @@ int main(int argc, char *argv[])
     ImGui::DestroyContext();
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
+    
+    if (window)
+    {
+        glfwDestroyWindow(window);
+    }
 
     glfwDestroyWindow(window);
     glfwTerminate();

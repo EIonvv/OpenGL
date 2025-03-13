@@ -178,23 +178,6 @@ static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_loc
     glEnableVertexAttribArray(vtex_location);
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
-    // Load texture
-    std::map<std::string, std::string> textureMap = {
-        {"plane", "resources\\textures\\wood.jpg"},
-        {"cube", "resources\\textures\\concrete.jpg"}};
-
-    for (const auto &[textureName, texturePath] : textureMap)
-    {
-        if (textureName == "plane")
-        {
-            loadTexture(texturePath.c_str(), planeTexture);
-        }
-        else if (textureName == "cube")
-        {
-            loadTexture(texturePath.c_str(), cubeTexture);
-        }
-    }
-
     // Cleanup
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
