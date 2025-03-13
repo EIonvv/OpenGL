@@ -12,7 +12,7 @@ To build the project, you need to have the following libraries installed:
 - SPDLOG
 - STB_IMAGE
 
-Build the project using the shortcut the gear icon in the status bar of Visual Studio Code.
+Build the project using the shortcut or the gear icon in the status bar of Visual Studio Code.
 
 
 ## Run the project (Windows)
