@@ -5,8 +5,8 @@
 #include <spdlog/spdlog.h>
 #include <GLFW/glfw3.h>
 #include <unordered_map>
-#include "../render/text/text_renderer.h"
-#include "../config.h"
+#include "../../render/text/text_renderer.h"
+#include "../../config.h"
 
 // Declare external variables
 extern bool cubePOVMode; // Add this to access cubePOVMode from main.cpp
@@ -200,6 +200,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 
     if (mode == debug)
     {
+        /* Spams the console with key press events wastes resources
         spdlog::info("Key {} ({}) {} - Mods: {}{}{}{} - Combined: {}",
                      keyStr, scancode, actionStr,
                      (mods & GLFW_MOD_SHIFT) ? "SHIFT " : "",
@@ -207,6 +208,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
                      (mods & GLFW_MOD_ALT) ? "ALT " : "",
                      (mods & GLFW_MOD_SUPER) ? "SUPER " : "",
                      KeyState::pressedKeys);
+        */
 
         if (action == GLFW_RELEASE)
         {

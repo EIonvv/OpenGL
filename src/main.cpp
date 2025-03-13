@@ -19,8 +19,8 @@
 #include <tracy/Tracy.hpp>
 #endif
 
-#include "keyboard/keyboard.h"
-#include "mouse/mouse_callback/mouse_callback.h"
+#include "callbacks/keyboard/keyboard.h"
+#include "callbacks/mouse/mouse_callback.h"
 #include "mouse/mouse_position/get_mouse_position.h"
 #include "render/vertex/vertex.h"
 #include "render/text/text_renderer.h"
@@ -46,7 +46,7 @@ static double currentFPS = 0.0;
 static TextRenderer *textRenderer = nullptr;
 
 // Start at the plane just in front of the cube
-static glm::vec3 cameraPos = glm::vec3(-3.0f, 0.0f, 0.0f);
+static glm::vec3 cameraPos = glm::vec3(5.0f, 0.0f, 5.0f);
 static bool cubePOVMode = false; // New flag for cube POV mode
 
 // Error callback
@@ -235,22 +235,22 @@ GLFWwindow *initializeWindow()
     return window;
 }
 
-// Initialize text renderer
-void initializeTextRenderer()
+void SimpleGravity(float deltaTime, glm::mat4 &model, const Vertex *vertices, const Vertex *planeVertices)
 {
-    ZoneScoped; // Tracy: Profile this function
-    try
+    // Gravity and collision
+    SquarePos.y -= 0.1f * static_cast<float>(deltaTime); // Simple gravity
+    if (isCubeCollidingWithPlane(model, vertices, planeVertices))
     {
-        std::string fontPath = "resources\\fonts\\arlrbd.ttf";
-        spdlog::info("Font path: {}", fontPath);
-
-        textRenderer = new TextRenderer(fontPath.c_str(), 32);
-        keyboardTextRenderer = textRenderer;
-    }
-    catch (const std::exception &e)
-    {
-        spdlog::error("Failed to initialize TextRenderer: {}", e.what());
-        throw;
+        float lowestY = std::numeric_limits<float>::max();
+        for (int i = 0; i < 8; i++)
+        {
+            glm::vec4 vertex(vertices[i].pos[0], vertices[i].pos[1], vertices[i].pos[2], 1.0f);
+            glm::vec4 worldPos = model * vertex;
+            lowestY = std::min(lowestY, worldPos.y);
+        }
+        float planeY = -1.0f;
+        if (lowestY < planeY)
+            SquarePos.y += (planeY - lowestY);
     }
 }
 
@@ -282,37 +282,38 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
     if (pressing_w)
     {
         if (cubePOVMode)
-            SquarePos += direction * speed;
+            SquarePos += direction * speed * (float)deltaTime * 60.0f; // Speed up in POV mode
         else
             cameraPos += direction * speed;
     }
     if (pressing_s)
     {
         if (cubePOVMode)
-            SquarePos -= direction * speed;
+            SquarePos -= direction * speed * (float)deltaTime * 60.0f; // Speed up in POV mode
         else
             cameraPos -= direction * speed;
     }
     if (pressing_a)
     {
         if (cubePOVMode)
-            SquarePos -= right * speed;
+            SquarePos -= right * speed * (float)deltaTime * 60.0f; // Speed up in POV mode
         else
             cameraPos -= right * speed;
     }
     if (pressing_d)
     {
         if (cubePOVMode)
-            SquarePos += right * speed;
+            SquarePos += right * speed * (float)deltaTime * 60.0f; // Speed up in POV mode
         else
             cameraPos += right * speed;
     }
 
     // Smooth rotation with mouse
-    float rotationSpeed = 1.0f;                               // Degrees per second per pixel
+    float rotationSpeed = 1.0f;                                                       // Degrees per second per pixel
     rotationAngles.y += static_cast<float>(mouseDelta.x) * rotationSpeed * deltaTime; // Yaw
     rotationAngles.x -= static_cast<float>(mouseDelta.y) * rotationSpeed * deltaTime; // Pitch (inverted)
     mouseDelta *= 0.9f;
+
     // Dampen delta over time (adjustable)
     if (pressing_up)
         rotationAngles.x -= rotationSpeed; // Pitch up
@@ -338,22 +339,6 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
             SquarePos.z -= delta.y * glm::clamp(0.002f * ratio, 0.002f, 0.01f) * static_cast<float>(deltaTime) * 60.0f;
         }
         lastMousePos = mousePos;
-
-        // Gravity and collision
-        SquarePos.y -= 0.1f * static_cast<float>(deltaTime); // Simple gravity
-        if (isCubeCollidingWithPlane(model, vertices, planeVertices))
-        {
-            float lowestY = std::numeric_limits<float>::max();
-            for (int i = 0; i < 8; i++)
-            {
-                glm::vec4 vertex(vertices[i].pos[0], vertices[i].pos[1], vertices[i].pos[2], 1.0f);
-                glm::vec4 worldPos = model * vertex;
-                lowestY = std::min(lowestY, worldPos.y);
-            }
-            float planeY = -1.0f;
-            if (lowestY < planeY)
-                SquarePos.y += (planeY - lowestY);
-        }
     }
 
     // Mouse dragging in POV mode (optional, can be adjusted or removed)
@@ -368,6 +353,9 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
             spdlog::info("Cube position: ({}, {}, {})", SquarePos.x, SquarePos.y, SquarePos.z);
     }
     lastMousePos = mousePos;
+
+    // Simple gravity and collision
+    SimpleGravity(deltaTime, model, vertices, planeVertices);
 
     model = glm::translate(glm::mat4(1.0f), SquarePos);
     model = glm::rotate(model, glm::radians(rotationAngles.x), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -384,7 +372,10 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
     }
 
-    glm::mat4 view = glm::lookAt(cameraPos, cameraPos + direction, up);
+    // invert the camera position for the cube POV mode
+    glm::mat4 view = glm::lookAt(cameraPos, SquarePos, up / 2.0f);
+
+    // look in the direction of the cube
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), ratio, 0.1f, 100.0f);
     mvp = projection * view * model;
 }
@@ -449,8 +440,9 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
     // Render cube only if not in cubePOVMode
     if (!cubePOVMode)
     {
+        // Render cube (with texture)
         glm::mat4 cubeMVP = projection * view * model;
-        glUniform1i(useTextureLocation, 1);
+        glUniform1i(useTextureLocation, 1); // Important to enable texture or else it will render as gray or black
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, cubeTexture);
         glUniform1i(textureLocation, 0);
@@ -563,7 +555,7 @@ int main(int argc, char *argv[])
 
     try
     {
-        initializeTextRenderer();
+        initializeTextRenderer((TextRenderer *&)textRenderer);
     }
     catch (const std::exception &)
     {
@@ -596,7 +588,7 @@ int main(int argc, char *argv[])
             updateCube(window, model, mvp, width, height, ratio, (float)fixedDeltaTime);
             accumulator -= fixedDeltaTime;
         }
-        
+
         renderScene(window, program, mvp_location, vertex_array, element_buffer,
                     planeVertexArray, planeElementBuffer, model, ratio);
 

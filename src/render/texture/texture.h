@@ -7,7 +7,7 @@
 #include <spdlog/spdlog.h>
 
 // Load texture
-static void loadTexture(const char *filepath, GLuint &planeTexture)
+static bool loadTexture(const char *filepath, GLuint &planeTexture)
 {
     glGenTextures(1, &planeTexture);
     glBindTexture(GL_TEXTURE_2D, planeTexture);
@@ -20,18 +20,28 @@ static void loadTexture(const char *filepath, GLuint &planeTexture)
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
     unsigned char *data = stbi_load(filepath, &width, &height, &nrChannels, 0);
-    if (data)
+    try
     {
-        GLenum format = nrChannels == 3 ? GL_RGB : GL_RGBA;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        spdlog::info("Texture: {} loaded successfully: {}x{}", filepath, width, height);
+        if (data)
+        {
+            GLenum format = nrChannels == 3 ? GL_RGB : GL_RGBA;
+            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            spdlog::info("Texture: {} loaded successfully: {}x{}", filepath, width, height);
+        }
+        else
+        {
+            spdlog::error("Failed to load texture: {}", filepath);
+            return false;
+        }
     }
-    else
+    catch (const std::exception &e)
     {
-        spdlog::error("Failed to load texture: {}", filepath);
+        spdlog::error("Failed to load texture: {}", e.what());
+        return false;
     }
     stbi_image_free(data);
+    return true;
 }
 
 #endif /* TEXTURE_H */

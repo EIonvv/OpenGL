@@ -33,7 +33,6 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 
 // Mouse callback for camera rotation
 static glm::vec2 rotationAngles(0.0f, 0.0f);
-// Global variables
 static glm::vec2 mouseDelta(0.0f);
 
 static void mouse_callback(GLFWwindow *window, double xpos, double ypos)

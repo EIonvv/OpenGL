@@ -37,12 +37,14 @@ static const GLuint indices[36] = {
     5, 4, 7, 7, 6, 5, 4, 0, 3, 3, 7, 4,
     3, 2, 6, 6, 7, 3, 0, 4, 5, 5, 1, 0};
 
-// Plane data (increased size to 10x10)
-static const Vertex planeVertices[4] = {
+// Plane data (increased size to 12x12)
+static const Vertex planeVertices[6] = {
     {{-5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
     {{5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
     {{5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
-    {{-5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}};
+    {{-5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}},
+    {{-5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}}};
 
 static const GLuint planeIndices[6] = {0, 1, 2, 2, 3, 0};
 
@@ -84,7 +86,7 @@ static const char *fragment_shader_text =
     "}\n";
 
 // Setup OpenGL buffers and shaders
-void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, GLint &vcol_location,
+static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, GLint &vcol_location,
                     GLuint &vertex_array, GLuint &vertex_buffer, GLuint &element_buffer,
                     GLuint &planeVertexArray, GLuint &planeVertexBuffer, GLuint &planeElementBuffer)
 {
@@ -177,10 +179,21 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
     // Load texture
-    std::string woodTexturePath = "resources/textures/wood.jpg";
-    std::string cubeTexturePath = "resources/textures/concrete.jpg";
-    loadTexture(woodTexturePath.c_str(), planeTexture);
-    loadTexture(cubeTexturePath.c_str(), cubeTexture);
+    std::map<std::string, std::string> textureMap = {
+        {"plane", "resources\\textures\\wood.jpg"},
+        {"cube", "resources\\textures\\concrete.jpg"}};
+
+    for (const auto &[textureName, texturePath] : textureMap)
+    {
+        if (textureName == "plane")
+        {
+            loadTexture(texturePath.c_str(), planeTexture);
+        }
+        else if (textureName == "cube")
+        {
+            loadTexture(texturePath.c_str(), cubeTexture);
+        }
+    }
 
     // Cleanup
     glDeleteShader(vertex_shader);
@@ -188,7 +201,25 @@ void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, 
     glUseProgram(program);
     glUniform1i(useTextureLocation, 1);
     glUniform1i(textureLocation, 0);
-    
+}
+
+// Initialize text renderer
+static void initializeTextRenderer(TextRenderer *&textRenderer)
+{
+    ZoneScoped; // Tracy: Profile this function
+    try
+    {
+        std::string fontPath = "resources\\fonts\\arlrbd.ttf";
+        spdlog::info("Font path: {}", fontPath);
+
+        textRenderer = new TextRenderer(fontPath.c_str(), 32);
+        keyboardTextRenderer = textRenderer;
+    }
+    catch (const std::exception &e)
+    {
+        spdlog::error("Failed to initialize TextRenderer: {}", e.what());
+        throw;
+    }
 }
 
 #endif /* SETUPRENDERER_H */
