@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(
     OpenGLRendering
     VERSION 1.0.0
-    DESCRIPTION "OpenGL Text Rendering"
+    DESCRIPTION "OpenGL Text Rendering with ImGui"
     LANGUAGES CXX C
 )
 
@@ -86,18 +86,17 @@ else()
     message(STATUS "FreeType found on system.")
 endif()
 
-# Tracy (Fetch Tracy from GitHub)
+# Tracy
 find_package(Tracy QUIET)
 if (NOT Tracy_FOUND)
     message(STATUS "Tracy not found, fetching from GitHub...")
     FetchContent_Declare(
         tracy
         GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-        GIT_TAG v0.11.1  # Use the latest stable version as of your current date (March 2025)
+        GIT_TAG v0.11.1
     )
-    # Configure Tracy options
     set(TRACY_ENABLE ON CACHE BOOL "Enable Tracy profiling" FORCE)
-    set(TRACY_ON_DEMAND ON CACHE BOOL "Enable on-demand profiling" FORCE)  # Only profiles when the Tracy server is connected
+    set(TRACY_ON_DEMAND ON CACHE BOOL "Enable on-demand profiling" FORCE)
     set(TRACY_NO_EXIT OFF CACHE BOOL "Do not wait for connection on exit" FORCE)
     FetchContent_MakeAvailable(tracy)
 else()
@@ -116,6 +115,33 @@ if(NOT cpp-base64_POPULATED)
     add_library(cpp-base64 INTERFACE)
     target_include_directories(cpp-base64 INTERFACE ${cpp-base64_SOURCE_DIR})
 endif()
+
+# ImGui (header-only library with backends)
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.91.4  # Use the latest stable version as of March 2025
+)
+FetchContent_MakeAvailable(imgui)
+
+# Add ImGui as a library with necessary source files
+set(IMGUI_DIR ${imgui_SOURCE_DIR})
+add_library(imgui STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+)
+target_link_libraries(imgui PUBLIC
+    glfw
+    glad  # For OpenGL functions
+)
 
 # Add GLAD source files
 set(GLAD_DIR ${CMAKE_SOURCE_DIR}/include/glad)
@@ -136,9 +162,11 @@ add_executable(${PROJECT_NAME}
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     include
-    ${CMAKE_BINARY_DIR}/include  # Include the directory with resources.h
+    ${CMAKE_BINARY_DIR}/include
     ${GLAD_DIR}
     ${cpp-base64_SOURCE_DIR}
+    ${IMGUI_DIR}  # Include ImGui headers
+    ${IMGUI_DIR}/backends
 )
 
 # Link libraries
@@ -148,7 +176,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     spdlog::spdlog
     freetype
-    Tracy::TracyClient  # Link TracyClient library
+    Tracy::TracyClient
+    imgui  # Link ImGui
     ${CMAKE_DL_LIBS}
 )
 
@@ -161,7 +190,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/src/resources"
+        "${CMAKE_SOURCE_DIR}/resources"
         "${CMAKE_BINARY_DIR}/bin/Release/resources"
         COMMAND ${CMAKE_COMMAND} -E echo "Copying resources to ${CMAKE_BINARY_DIR}/bin/Release/resources"
     )

@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
@@ -37,6 +39,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image/stb_image.h"
 #include "render/setupRenderer.h"
+#include <imgui_impl_opengl3.h>
 
 // Global variables
 static glm::vec3 SquarePos(0.0f);
@@ -47,6 +50,7 @@ static double currentFPS = 0.0;
 static TextRenderer *textRenderer = nullptr;
 static glm::vec3 cameraPos = glm::vec3(0.0f, 5.0f, 10.0f);
 static bool cubePOVMode = false;
+static bool isColliding = false;
 
 // Plane structure
 struct Plane
@@ -79,19 +83,28 @@ static void error_callback(int error, const char *description)
     fprintf(stderr, "Error: %s\n", description);
 }
 
-// Generate plane vertices
-std::vector<Vertex> generatePlaneVertices(float width, float depth, const glm::vec3 &position)
+// Generate plane vertices with rotation
+std::vector<Vertex> generatePlaneVertices(float width, float depth, const glm::vec3 &position, const glm::vec3 &rotation)
 {
     ZoneScoped; // Tracy: Profile this function
-    
+
     std::vector<Vertex> vertices(4);
     float halfWidth = width / 2.0f;
     float halfDepth = depth / 2.0f;
 
-    vertices[0] = {{position.x - halfWidth, position.y, position.z - halfDepth}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}}; // Bottom-left
-    vertices[1] = {{position.x + halfWidth, position.y, position.z - halfDepth}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}}; // Bottom-right
-    vertices[2] = {{position.x + halfWidth, position.y, position.z + halfDepth}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}}; // Top-right
-    vertices[3] = {{position.x - halfWidth, position.y, position.z + halfDepth}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}; // Top-left
+    glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    rotationMatrix = glm::rotate(rotationMatrix, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    rotationMatrix = glm::rotate(rotationMatrix, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    glm::vec4 bottomLeft = rotationMatrix * glm::vec4(-halfWidth, 0.0f, -halfDepth, 1.0f);
+    glm::vec4 bottomRight = rotationMatrix * glm::vec4(halfWidth, 0.0f, -halfDepth, 1.0f);
+    glm::vec4 topRight = rotationMatrix * glm::vec4(halfWidth, 0.0f, halfDepth, 1.0f);
+    glm::vec4 topLeft = rotationMatrix * glm::vec4(-halfWidth, 0.0f, halfDepth, 1.0f);
+
+    vertices[0] = {{position.x + bottomLeft.x, position.y + bottomLeft.y, position.z + bottomLeft.z}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}};    // Bottom-left
+    vertices[1] = {{position.x + bottomRight.x, position.y + bottomRight.y, position.z + bottomRight.z}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}}; // Bottom-right
+    vertices[2] = {{position.x + topRight.x, position.y + topRight.y, position.z + topRight.z}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}};          // Top-right
+    vertices[3] = {{position.x + topLeft.x, position.y + topLeft.y, position.z + topLeft.z}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}};             // Top-left
 
     return vertices;
 }
@@ -231,7 +244,6 @@ bool isCubeCollidingWithPlane(const glm::mat4 &model, const std::vector<Plane> &
 
         glm::vec3 planeEdge1 = planeWorldVertices[1] - planeWorldVertices[0];
         glm::vec3 planeEdge2 = planeWorldVertices[3] - planeWorldVertices[0];
-
         for (const auto &vertex : cubeWorldVertices)
         {
             glm::vec3 toVertex = vertex - planeWorldVertices[0];
@@ -296,6 +308,7 @@ GLFWwindow *initializeWindow()
         exit(EXIT_FAILURE);
     }
 
+    glEnable(GL_BLEND);
     glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
     return window;
@@ -326,7 +339,6 @@ void SimpleGravity(float deltaTime, glm::mat4 &model, const std::vector<Plane> &
 // Update cube position and orientation
 void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio, float deltaTime, const std::vector<Plane> &planes)
 {
-    ZoneScoped; // Tracy: Profile this function
 
     float baseSpeed = deltaTime * 12.0f;
     float speed = baseSpeed;
@@ -377,9 +389,14 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
     }
 
     float rotationSpeed = 1.0f;
-    rotationAngles.y += static_cast<float>(mouseDelta.x) * rotationSpeed * deltaTime;
-    rotationAngles.x -= static_cast<float>(mouseDelta.y) * rotationSpeed * deltaTime;
-    mouseDelta *= 0.9f;
+
+    // if f2pressed then enable movement of the camera
+    if (mouseInputEnabled)
+    {
+        rotationAngles.y += static_cast<float>(mouseDelta.x) * rotationSpeed * deltaTime;
+        rotationAngles.x -= static_cast<float>(mouseDelta.y) * rotationSpeed * deltaTime;
+        mouseDelta *= 0.9f;
+    }
 
     if (pressing_up)
         rotationAngles.x -= rotationSpeed;
@@ -424,7 +441,6 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
 // Update frame timing
 void updateFrameTiming(double &previousTime, double &deltaTime, double &accumulator)
 {
-    ZoneScoped; // Tracy: Profile this function
 
     double currentTime = glfwGetTime();
     deltaTime = currentTime - previousTime;
@@ -495,7 +511,7 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
     // Render text
     glDisable(GL_DEPTH_TEST);
     int collidingPlaneIndex;
-    bool isColliding = isCubeCollidingWithPlane(model, planes, collidingPlaneIndex);
+    isColliding = isCubeCollidingWithPlane(model, planes, collidingPlaneIndex);
     glm::vec2 mousePos = GetMouse::getMousePosition(window);
     glm::mat4 cubeMVP = projection * view * model;
     bool isMouseOverCube = isPointInCube(mousePos, cubeMVP, width, height);
@@ -518,20 +534,11 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
         textRenderer->renderText(cursorText, 10.0f, 50.0f, 0.5f, glm::vec3(0.0f, 1.0f, 0.0f));
     }
 
-    if (isColliding)
+    if (!mouseInputEnabled)
     {
-        char collisionText[64];
-        snprintf(collisionText, sizeof(collisionText), "Colliding with plane %d!", collidingPlaneIndex);
-        textRenderer->renderText(collisionText, 10.0f, 70.0f, 0.5f, glm::vec3(1.0f, 0.0f, 0.0f));
+        // display text letting the user know about F2 in center of screen
+        textRenderer->renderText("Press F2 to enable mouse input", static_cast<float>(width) / 2.0f - 200.0f, static_cast<float>(height) / 2.0f, 0.5f, glm::vec3(1.0f, 0.0f, 0.0f));
     }
-
-    char fpsText[16];
-    snprintf(fpsText, sizeof(fpsText), "FPS: %.1f", currentFPS);
-    textRenderer->renderText(fpsText, 10.0f, height - 30.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
-
-    char hardwareText[128];
-    snprintf(hardwareText, sizeof(hardwareText), "GPU: %s", glGetString(GL_RENDERER));
-    textRenderer->renderText(hardwareText, 10.0f, height - 50.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
 
     glEnable(GL_DEPTH_TEST);
 }
@@ -560,11 +567,42 @@ void cleanup(GLuint program, GLuint cubeVAO, GLuint cubeVBO, GLuint cubeEBO, std
     glfwTerminate();
 }
 
+static void renderImGui()
+{
+    // Start ImGui frame
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    // clang-format off
+    // ImGui window
+    ImGui::Begin("Debug Window");
+    ImGui::Text("FPS:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%.1f", currentFPS);
+    ImGui::Text("OpenGL:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", glGetString(GL_VERSION));
+    ImGui::Text("GPU:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "%s", glGetString(GL_RENDERER));
+    ImGui::Text("Cube Rotation:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "(%.1f, %.1f)", rotationAngles.x, rotationAngles.y);
+    ImGui::Text("Cube Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(%.2f, %.2f, %.2f)", SquarePos.x, SquarePos.y, SquarePos.z);
+    ImGui::Text("Camera Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.5f, 0.0f, 0.5f, 1.0f), "(%.2f, %.2f, %.2f)", cameraPos.x, cameraPos.y, cameraPos.z);
+    // isColliding ? ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Colliding with plane %d!", collidingPlaneIndex) : ImGui::Text("Not colliding");
+    ImGui::Text("Box Collision:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", isColliding ? "Colliding" : "Not colliding");
+    // clang-format on
+
+    if (ImGui::Button("Toggle Cube POV Mode"))
+    {
+        cubePOVMode = !cubePOVMode;
+    }
+    ImGui::End();
+
+    // Render ImGui
+    glDisable(GL_DEPTH_TEST); // Disable depth test for ImGui
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
 // Main function
 int main(int argc, char *argv[])
 {
-    ZoneScoped; // Tracy: Profile this function
-
+    // Parse command-line arguments
     if (argc > 1)
     {
         targetFPS = std::atoi(argv[1]);
@@ -580,13 +618,30 @@ int main(int argc, char *argv[])
     rotationAngles.x = 45.0f;
     rotationAngles.y = 0.0f;
 
+    // Initialize GLFW and window
     GLFWwindow *window = initializeWindow();
+
+    // Initialize ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
+
+    if (io.Fonts->AddFontFromFileTTF("resources\\fonts\\arlrbd.ttf", 16.0f) == NULL)
+    {
+        spdlog::error("Failed to load font file");
+        return -1;
+    }
+
+    // Setup ImGui style
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330 core");
 
     // Setup shaders
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
     glCompileShader(vertex_shader);
-
     GLint success;
     glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
     if (!success)
@@ -599,7 +654,6 @@ int main(int argc, char *argv[])
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
     glCompileShader(fragment_shader);
-
     glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
     if (!success)
     {
@@ -612,7 +666,6 @@ int main(int argc, char *argv[])
     glAttachShader(program, vertex_shader);
     glAttachShader(program, fragment_shader);
     glLinkProgram(program);
-
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success)
     {
@@ -631,15 +684,12 @@ int main(int argc, char *argv[])
     GLuint cubeVAO, cubeVBO, cubeEBO;
     glGenVertexArrays(1, &cubeVAO);
     glBindVertexArray(cubeVAO);
-
     glGenBuffers(1, &cubeVBO);
     glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-
     glGenBuffers(1, &cubeEBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
-
     glEnableVertexAttribArray(vpos_location);
     glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
     glEnableVertexAttribArray(vcol_location);
@@ -647,11 +697,12 @@ int main(int argc, char *argv[])
     glEnableVertexAttribArray(vtex_location);
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
-    // Generate planes dynamically
+    // Generate planes
     std::vector<Plane> planes;
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, -1.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, -1.0f, 0.0f)});                       // Central
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, 12.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // North
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, 0.0f, 0.0f)});
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});
 
+    // Setup plane buffers
     for (auto &plane : planes)
     {
         setupPlaneBuffers(plane, vpos_location, vcol_location, vtex_location);
@@ -665,7 +716,6 @@ int main(int argc, char *argv[])
     try
     {
         std::string fontPath = "resources\\fonts\\arlrbd.ttf";
-        spdlog::info("Font path: {}", fontPath);
         textRenderer = new TextRenderer(fontPath.c_str(), 32);
         keyboardTextRenderer = textRenderer;
     }
@@ -679,36 +729,58 @@ int main(int argc, char *argv[])
     double previousTime = glfwGetTime();
     glm::mat4 model;
     double accumulator = 0.0;
-    const double fixedDeltaTime = 1.0 / 60.0;
+    const double fixedDeltaTime = 1.0 / 60.0f;
 
     while (!glfwWindowShouldClose(window))
     {
         ZoneScoped; // Tracy: Profile this frame
-        
+
+        // Frame timing
         double deltaTime;
         updateFrameTiming(previousTime, deltaTime, accumulator);
 
+        // Get window size
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         float ratio = width / (float)height;
 
+        // Update cube
         glm::mat4 mvp;
-        while (accumulator >= fixedDeltaTime)
+        const int maxUpdates = 5; // Prevent spiral of death
+        int updates = 0;
+        while (accumulator >= fixedDeltaTime && updates < maxUpdates)
         {
             updateCube(window, model, mvp, width, height, ratio, (float)fixedDeltaTime, planes);
             accumulator -= fixedDeltaTime;
+            updates++;
         }
+        // Clear the screen
+        glViewport(0, 0, width, height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // Render 3D scene
         renderScene(window, program, mvp_location, cubeVAO, cubeEBO, planes, model, ratio);
 
+        // Render ImGui
+        renderImGui();
+
+        glEnable(GL_DEPTH_TEST); // Re-enable depth test for next frame
+
+        // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        FrameMark;
+        FrameMark; // Tracy frame marker
     }
 
+    // Cleanup
     cleanup(program, cubeVAO, cubeVBO, cubeEBO, planes);
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
+
     return 0;
 }

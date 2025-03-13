@@ -18,10 +18,14 @@ static bool pressing_s = false;      // Flag to control walking backward
 static bool pressing_a = false;      // Flag to control walking left
 static bool pressing_d = false;      // Flag to control walking right
 static bool pressing_v = false;      // Flag to control cube POV mode toggle
-static bool pressing_up = false;     // Flag to control looking up
-static bool pressing_down = false;   // Flag to control looking down
-static bool pressing_left = false;   // Flag to control looking left
-static bool pressing_right = false;  // Flag to control looking right
+static bool pressing_f2 = false;     // Flag to control debug mode toggle
+
+static bool pressing_up = false;    // Flag to control looking up
+static bool pressing_down = false;  // Flag to control looking down
+static bool pressing_left = false;  // Flag to control looking left
+static bool pressing_right = false; // Flag to control looking right
+
+static bool mouseInputEnabled = false; // Flag to control mouse input
 
 // Key state tracking structure
 struct KeyState
@@ -111,8 +115,7 @@ static const std::unordered_map<int, std::pair<std::string, std::string>> keyMap
     {GLFW_KEY_UP, {"[UP]", "[UP]"}},
     {GLFW_KEY_DOWN, {"[DOWN]", "[DOWN]"}},
     {GLFW_KEY_LEFT, {"[LEFT]", "[LEFT]"}},
-    {GLFW_KEY_RIGHT, {"[RIGHT]", "[RIGHT]"}}
-};
+    {GLFW_KEY_RIGHT, {"[RIGHT]", "[RIGHT]"}}};
 
 // Updated key_callback with cubePOVMode toggle
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -126,6 +129,14 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
         KeyState::pressedKeys.clear();
         KeyState::keyStates.clear();
+
+        // Cleanup
+        if (keyboardTextRenderer != nullptr)
+        {
+            delete keyboardTextRenderer;
+            keyboardTextRenderer = nullptr;
+        }
+
         return;
     }
 
@@ -177,6 +188,13 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         KeyState::pressedKeys.clear();
         KeyState::keyStates.clear();
         return;
+    }
+    // if f2 is pressed, capture cursor to window toggle the cursor input
+    if (key == GLFW_KEY_F2 && action == GLFW_PRESS)
+    {
+        mouseInputEnabled = !mouseInputEnabled;
+        spdlog::info("Mouse input {}abled", mouseInputEnabled ? "en" : "dis");
+        glfwSetInputMode(window, GLFW_CURSOR, mouseInputEnabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
     }
 
     KeyState::keyStates[key] = (action != GLFW_RELEASE);

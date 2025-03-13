@@ -6,10 +6,16 @@
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
 
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyOpenGL.hpp>
+
+
 #include "../../config.h"
 
 static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 {
+    ZoneScoped;
+
     if (button == GLFW_MOUSE_BUTTON_LEFT)
     {
         if (action == GLFW_PRESS)
@@ -37,6 +43,8 @@ static glm::vec2 mouseDelta(0.0f);
 
 static void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 {
+    ZoneScoped;
+
     static bool firstMouse = true;
     static glm::vec2 lastPos(0.0f);
 
@@ -67,8 +75,6 @@ static void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 
     lastPos = currentPos;
 
-    // Capture mouse for continuous movement
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 #endif /* MOUSE_CALLBACK_H */
