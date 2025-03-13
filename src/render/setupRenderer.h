@@ -7,27 +7,28 @@
 #include <string>
 #include <fstream>
 #include <base64/base64.h>
-#include "../vertex/vertex.h"
-#include "../texture/texture.h"
-#include "../../config.h"
+#include "vertex/vertex.h"
+#include "texture/texture.h"
+#include "../config.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-static GLuint planeTexture; // Plane texture
-static GLuint cubeTexture;  // Cube texture
+// Texture variables
+static GLuint planeTexture;
+static GLuint cubeTexture;
 static GLint textureLocation;
 
-// Cube data with updated texture coordinates
+// Cube data
 static const Vertex vertices[8] = {
-    {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},  // 0: Front bottom-left (Bottom face: bottom-left)
-    {{0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},   // 1: Front bottom-right (Bottom face: bottom-right)
-    {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},    // 2: Front top-right (Top face: top-right)
-    {{-0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},   // 3: Front top-left (Top face: top-left)
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 4: Back bottom-left (Bottom face: top-left)
-    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},  // 5: Back bottom-right (Bottom face: top-right)
-    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   // 6: Back top-right (Top face: bottom-right)
-    {{-0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},  // 7: Back top-left (Top face: bottom-left)
+    {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},  // 0: Front bottom-left
+    {{0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},   // 1: Front bottom-right
+    {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},    // 2: Front top-right
+    {{-0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},   // 3: Front top-left
+    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 4: Back bottom-left
+    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},  // 5: Back bottom-right
+    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   // 6: Back top-right
+    {{-0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},  // 7: Back top-left
 };
 
 static const GLuint indices[36] = {
@@ -35,18 +36,45 @@ static const GLuint indices[36] = {
     5, 4, 7, 7, 6, 5, 4, 0, 3, 3, 7, 4,
     3, 2, 6, 6, 7, 3, 0, 4, 5, 5, 1, 0};
 
-// Plane data (increased size to 12x12)
-static const Vertex planeVertices[6] = {
-    {{-5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
-    {{5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
-    {{5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
-    {{-5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}},
-    {{-5.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
-    {{5.0f, 0.0f, 5.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}}};
+// Plane data (12x12 centered at origin)
+static const Vertex planeVertices[4] = {
+    {{-6.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}}, // Bottom-left
+    {{6.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},  // Bottom-right
+    {{6.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},   // Top-right
+    {{-6.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}   // Top-left
+};
+
+// North plane (z = 6 to 18)
+static const Vertex planeNorthVertices[4] = {
+    {{-6.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{6.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{6.0f, 0.0f, 18.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
+    {{-6.0f, 0.0f, 18.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}};
+
+// South plane (z = -6 to -18)
+static const Vertex planeSouthVertices[4] = {
+    {{-6.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{6.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{6.0f, 0.0f, -18.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
+    {{-6.0f, 0.0f, -18.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}};
+
+// East plane (x = 6 to 18)
+static const Vertex planeEastVertices[4] = {
+    {{6.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{18.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{18.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
+    {{6.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}};
+
+// West plane (x = -6 to -18)
+static const Vertex planeWestVertices[4] = {
+    {{-18.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{-6.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{-6.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
+    {{-18.0f, 0.0f, 6.0f}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}}};
 
 static const GLuint planeIndices[6] = {0, 1, 2, 2, 3, 0};
 
-// Shaders (modified fragment shader to use a fallback color if texture fails)
+// Shaders
 static const char *vertex_shader_text =
     "#version 330\n"
     "uniform mat4 MVP;\n"
@@ -74,7 +102,7 @@ static const char *fragment_shader_text =
     "    if (useTexture == 1) {\n"
     "        vec4 texColor = texture(textureSampler, texCoord);\n"
     "        if (texColor.a < 0.1) {\n"
-    "            fragment = vec4(0.5, 0.5, 0.5, 1.0); // Fallback color (gray)\n"
+    "            fragment = vec4(0.5, 0.5, 0.5, 1.0);\n"
     "        } else {\n"
     "            fragment = texColor;\n"
     "        }\n"
@@ -84,9 +112,15 @@ static const char *fragment_shader_text =
     "}\n";
 
 // Setup OpenGL buffers and shaders
+
+// Setup rendering
 static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_location, GLint &vcol_location,
-                    GLuint &vertex_array, GLuint &vertex_buffer, GLuint &element_buffer,
-                    GLuint &planeVertexArray, GLuint &planeVertexBuffer, GLuint &planeElementBuffer)
+                           GLuint &vertex_array, GLuint &vertex_buffer, GLuint &element_buffer,
+                           GLuint &planeVertexArray, GLuint &planeVertexBuffer, GLuint &planeElementBuffer,
+                           GLuint &planeNorthVertexArray, GLuint &planeNorthVertexBuffer, GLuint &planeNorthElementBuffer,
+                           GLuint &planeSouthVertexArray, GLuint &planeSouthVertexBuffer, GLuint &planeSouthElementBuffer,
+                           GLuint &planeEastVertexArray, GLuint &planeEastVertexBuffer, GLuint &planeEastElementBuffer,
+                           GLuint &planeWestVertexArray, GLuint &planeWestVertexBuffer, GLuint &planeWestElementBuffer)
 {
     // Cube setup
     glGenBuffers(1, &vertex_buffer);
@@ -97,7 +131,7 @@ static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_loc
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    // Plane setup
+    // Central Plane setup
     glGenBuffers(1, &planeVertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, planeVertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
@@ -149,7 +183,7 @@ static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_loc
     vpos_location = glGetAttribLocation(program, "vPos");
     vcol_location = glGetAttribLocation(program, "vCol");
     GLint vtex_location = glGetAttribLocation(program, "vTexCoord");
-    GLint textureLocation = glGetUniformLocation(program, "textureSampler");
+    textureLocation = glGetUniformLocation(program, "textureSampler");
     GLint useTextureLocation = glGetUniformLocation(program, "useTexture");
 
     // Cube VAO
@@ -160,11 +194,10 @@ static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_loc
     glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
     glEnableVertexAttribArray(vcol_location);
     glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, col));
-    // Enable texture coordinates for the cube
     glEnableVertexAttribArray(vtex_location);
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
-    // Plane VAO
+    // Central Plane VAO
     glGenVertexArrays(1, &planeVertexArray);
     glBindVertexArray(planeVertexArray);
     glBindBuffer(GL_ARRAY_BUFFER, planeVertexBuffer);
@@ -175,47 +208,11 @@ static void setupRendering(GLuint &program, GLint &mvp_location, GLint &vpos_loc
     glEnableVertexAttribArray(vtex_location);
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
-    // Load texture
-    std::map<std::string, std::string> textureMap = {
-        {"plane", "resources\\textures\\wood.jpg"},
-        {"cube", "resources\\textures\\concrete.jpg"}};
-
-    for (const auto &[textureName, texturePath] : textureMap)
-    {
-        if (textureName == "plane")
-        {
-            loadTexture(texturePath.c_str(), planeTexture);
-        }
-        else if (textureName == "cube")
-        {
-            loadTexture(texturePath.c_str(), cubeTexture);
-        }
-    }
-
-    // Cleanup
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
     glUseProgram(program);
     glUniform1i(useTextureLocation, 1);
     glUniform1i(textureLocation, 0);
-}
-
-// Initialize text renderer
-static void initializeTextRenderer(TextRenderer *&textRenderer)
-{
-    try
-    {
-        std::string fontPath = "resources\\fonts\\arlrbd.ttf";
-        spdlog::info("Font path: {}", fontPath);
-
-        textRenderer = new TextRenderer(fontPath.c_str(), 32);
-        keyboardTextRenderer = textRenderer;
-    }
-    catch (const std::exception &e)
-    {
-        spdlog::error("Failed to initialize TextRenderer: {}", e.what());
-        throw;
-    }
 }
 
 #endif /* SETUPRENDERER_H */

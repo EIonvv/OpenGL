@@ -19,9 +19,6 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 # Enable FetchContent
 include(FetchContent)
 
-# Find Python3 for resource generation
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-
 # GLFW
 find_package(glfw3 QUIET)
 if (NOT glfw3_FOUND)
@@ -110,9 +107,9 @@ target_include_directories(glad PUBLIC ${GLAD_DIR})
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include)
 
 # Add your source files
-add_executable(${PROJECT_NAME}
+add_executable(
+    ${PROJECT_NAME}
     src/main.cpp
-    src/render/text/text_renderer.cpp
 )
 
 # Include directories
