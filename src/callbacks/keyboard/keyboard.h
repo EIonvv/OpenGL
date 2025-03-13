@@ -12,7 +12,11 @@
 extern bool cubePOVMode; // Add this to access cubePOVMode from main.cpp
 
 static TextRenderer *keyboardTextRenderer = nullptr;
-static bool renderDebugText = false; // Flag to control debug text rendering
+static bool showDebugGUI = false; // Flag to control debug text rendering
+
+// Key flags
+static bool exitFlag = false;        // Flag to control exit
+
 static bool pressing_w = false;      // Flag to control walking forward
 static bool pressing_s = false;      // Flag to control walking backward
 static bool pressing_a = false;      // Flag to control walking left
@@ -24,6 +28,8 @@ static bool pressing_up = false;    // Flag to control looking up
 static bool pressing_down = false;  // Flag to control looking down
 static bool pressing_left = false;  // Flag to control looking left
 static bool pressing_right = false; // Flag to control looking right
+
+static bool vPressedLastFrame = false; // Flag to track if 'V' was pressed last frame   
 
 static bool mouseInputEnabled = false; // Flag to control mouse input
 
@@ -123,25 +129,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
     const char *actionStr = (action == GLFW_PRESS) ? "pressed" : (action == GLFW_RELEASE) ? "released"
                                                                                           : "repeated";
 
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    {
-        spdlog::info("Escape key pressed. Closing the window...");
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-        KeyState::pressedKeys.clear();
-        KeyState::keyStates.clear();
-
-        // Cleanup
-        if (keyboardTextRenderer != nullptr)
-        {
-            delete keyboardTextRenderer;
-            keyboardTextRenderer = nullptr;
-        }
-
-        return;
-    }
-
     // Toggle cube POV mode when 'V' is pressed
-    static bool vPressedLastFrame = false;
     if (key == GLFW_KEY_V && action == GLFW_PRESS && !vPressedLastFrame)
     {
         cubePOVMode = !cubePOVMode;
@@ -162,6 +150,9 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         break;
     case GLFW_KEY_D:
         pressing_d = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_ESCAPE:
+        exitFlag = true;
         break;
     // Arrow keys
     case GLFW_KEY_UP:
@@ -184,7 +175,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
     {
         mode = (mode == debug) ? release : debug;
         spdlog::info("Switching to {} mode", (mode == debug) ? "debug" : "release");
-        renderDebugText = (mode == debug); // Toggle debug text rendering
+        showDebugGUI = (mode == debug); // Toggle debug text rendering
         KeyState::pressedKeys.clear();
         KeyState::keyStates.clear();
         return;

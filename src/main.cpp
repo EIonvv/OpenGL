@@ -51,6 +51,7 @@ static TextRenderer *textRenderer = nullptr;
 static glm::vec3 cameraPos = glm::vec3(0.0f, 5.0f, 10.0f);
 static bool cubePOVMode = false;
 static bool isColliding = false;
+static int collidingPlaneIndex = -1;
 
 // Plane structure
 struct Plane
@@ -319,21 +320,54 @@ void SimpleGravity(float deltaTime, glm::mat4 &model, const std::vector<Plane> &
 {
     ZoneScoped; // Tracy: Profile this function
 
-    SquarePos.y -= 0.1f * deltaTime;
-    int collidingPlaneIndex;
+    // Default gravity direction (downward along Y-axis if no collision)
+    glm::vec3 gravityDirection = glm::vec3(0.0f, -1.0f, 0.0f);
+    float gravityStrength = 9.8f; // Gravity acceleration (m/s^2), adjust as needed
+
+    // Check for collision and adjust gravity direction if colliding
     if (isCubeCollidingWithPlane(model, planes, collidingPlaneIndex))
     {
-        float lowestY = std::numeric_limits<float>::max();
+        const Plane &collidingPlane = planes[collidingPlaneIndex];
+
+        // Calculate plane normal (using the snippet's method)
+        glm::vec3 edge1 = glm::make_vec3(collidingPlane.vertices[1].pos) - glm::make_vec3(collidingPlane.vertices[0].pos);
+        glm::vec3 edge2 = glm::make_vec3(collidingPlane.vertices[2].pos) - glm::make_vec3(collidingPlane.vertices[0].pos);
+        glm::vec3 planeNormal = glm::normalize(glm::cross(edge1, edge2));
+
+        // Gravity acts opposite to the plane normal (downward relative to the plane)
+        gravityDirection = -planeNormal;
+
+        // Calculate penetration depth and resolve collision
+        std::array<glm::vec3, 8> cubeWorldVertices;
         for (int i = 0; i < 8; i++)
         {
             glm::vec4 vertex(cubeVertices[i].pos[0], cubeVertices[i].pos[1], cubeVertices[i].pos[2], 1.0f);
             glm::vec4 worldPos = model * vertex;
-            lowestY = std::min(lowestY, worldPos.y);
+            cubeWorldVertices[i] = glm::vec3(worldPos.x, worldPos.y, worldPos.z);
         }
-        float planeY = planes[collidingPlaneIndex].position.y;
-        if (lowestY < planeY)
-            SquarePos.y += (planeY - lowestY);
+
+        float minPenetration = std::numeric_limits<float>::max();
+        for (const auto &vertex : cubeWorldVertices)
+        {
+            glm::vec3 toVertex = vertex - glm::make_vec3(collidingPlane.vertices[0].pos);
+            float distance = glm::dot(toVertex, planeNormal);
+            if (distance < 0.0f) // Vertex is below the plane
+            {
+                minPenetration = std::min(minPenetration, std::abs(distance));
+            }
+        }
+
+        // Push the cube up along the plane normal by the penetration depth
+        if (minPenetration != std::numeric_limits<float>::max())
+        {
+            SquarePos += planeNormal * minPenetration * (float)deltaTime * 0.01f; // Scale for reasonable speed
+            model = glm::translate(glm::mat4(1.0f), SquarePos);                   // Update model matrix
+        }
     }
+
+    // Apply gravity
+    SquarePos += gravityDirection * gravityStrength * deltaTime * 0.01f; // Scale for reasonable speed
+    model = glm::translate(glm::mat4(1.0f), SquarePos);                  // Update model matrix after gravity
 }
 
 // Update cube position and orientation
@@ -456,7 +490,6 @@ void updateFrameTiming(double &previousTime, double &deltaTime, double &accumula
         lastTime = currentTime;
     }
 }
-
 // Render scene
 void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint cubeVAO, GLuint cubeEBO, const std::vector<Plane> &planes, const glm::mat4 &model, float ratio)
 {
@@ -480,14 +513,14 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
     GLint useTextureLocation = glGetUniformLocation(program, "useTexture");
 
     // Render planes
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, planeTexture);
+    glUniform1i(textureLocation, 0);
+    glUniform1i(useTextureLocation, 1);
     for (const auto &plane : planes)
     {
         glm::mat4 planeModel = glm::translate(glm::mat4(1.0f), plane.position);
         glm::mat4 planeMVP = projection * view * planeModel;
-        glUniform1i(useTextureLocation, 1);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, planeTexture);
-        glUniform1i(textureLocation, 0);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(planeMVP));
         glBindVertexArray(plane.vao);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, plane.ebo);
@@ -499,9 +532,7 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
     {
         glm::mat4 cubeMVP = projection * view * model;
         glUniform1i(useTextureLocation, 1);
-        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, cubeTexture);
-        glUniform1i(textureLocation, 0);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(cubeMVP));
         glBindVertexArray(cubeVAO);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
@@ -515,17 +546,6 @@ void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint 
     glm::vec2 mousePos = GetMouse::getMousePosition(window);
     glm::mat4 cubeMVP = projection * view * model;
     bool isMouseOverCube = isPointInCube(mousePos, cubeMVP, width, height);
-
-    if (renderDebugText)
-    {
-        char debugText[128];
-        std::string retString = fmt::format("Cube position: ({:.2f}, {:.2f}, {:.2f}) [Rotation: ({:.1f}, {:.1f})]",
-                                            SquarePos.x, SquarePos.y, SquarePos.z, rotationAngles.x, rotationAngles.y);
-        snprintf(debugText, sizeof(debugText), "%s", retString.c_str());
-        textRenderer->renderText(debugText, 10.0f, 10.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
-        snprintf(debugText, sizeof(debugText), "OpenGL: %s", glGetString(GL_VERSION));
-        textRenderer->renderText(debugText, width - 240.0f, height - 30.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
-    }
 
     if (isMouseOverCube && !cubePOVMode)
     {
@@ -583,14 +603,23 @@ static void renderImGui()
     ImGui::Text("Cube Rotation:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "(%.1f, %.1f)", rotationAngles.x, rotationAngles.y);
     ImGui::Text("Cube Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(%.2f, %.2f, %.2f)", SquarePos.x, SquarePos.y, SquarePos.z);
     ImGui::Text("Camera Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.5f, 0.0f, 0.5f, 1.0f), "(%.2f, %.2f, %.2f)", cameraPos.x, cameraPos.y, cameraPos.z);
-    // isColliding ? ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Colliding with plane %d!", collidingPlaneIndex) : ImGui::Text("Not colliding");
-    ImGui::Text("Box Collision:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", isColliding ? "Colliding" : "Not colliding");
+    if (isColliding && cubePOVMode)
+    {
+        ImGui::Text("Box Collision:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s with plane %d", isColliding ? "Colliding" : "Not colliding", collidingPlaneIndex);
+    }
     // clang-format on
 
+    // Set button style for dark mode
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));        // Dark gray color
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // Lighter gray when hovered
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));  // Darker gray when active
     if (ImGui::Button("Toggle Cube POV Mode"))
     {
         cubePOVMode = !cubePOVMode;
     }
+
+    ImGui::PopStyleColor(3); // Pop the three style colors
+
     ImGui::End();
 
     // Render ImGui
@@ -699,8 +728,18 @@ int main(int argc, char *argv[])
 
     // Generate planes
     std::vector<Plane> planes;
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, 0.0f, 0.0f)});
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});
+
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, 0.0f, 0.0f)}); // Ground plane
+
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // Back plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // Front plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // Right plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // Left plane
+
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // back right plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // back left plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // front right plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // front left plane
 
     // Setup plane buffers
     for (auto &plane : planes)
@@ -708,23 +747,19 @@ int main(int argc, char *argv[])
         setupPlaneBuffers(plane, vpos_location, vcol_location, vtex_location);
     }
 
-    // Load textures
-    loadTexture("resources\\textures\\wood.jpg", planeTexture);
-    loadTexture("resources\\textures\\concrete.jpg", cubeTexture);
+    // Load textures and make a map for the textures
+    std::map<const char *, std::pair<GLuint, const char *>> textures = {
+        {"resources\\textures\\cube.png", {loadTexture("resources/textures/concrete.jpg", cubeTexture), "Cube Texture"}},
+        {"resources\\textures\\plane.png", {loadTexture("resources/textures/grass.jpg", planeTexture), "Plane Texture"}},
+    };
+
+    // Load icon
+    GLFWimage icon;
+    icon.pixels = stbi_load("resources\\textures\\icon.png", &icon.width, &icon.height, 0, 4);
+    glfwSetWindowIcon(window, 1, &icon);
 
     // Initialize text renderer
-    try
-    {
-        std::string fontPath = "resources\\fonts\\arlrbd.ttf";
-        textRenderer = new TextRenderer(fontPath.c_str(), 32);
-        keyboardTextRenderer = textRenderer;
-    }
-    catch (const std::exception &e)
-    {
-        spdlog::error("Failed to initialize TextRenderer: {}", e.what());
-        cleanup(program, cubeVAO, cubeVBO, cubeEBO, planes);
-        return -1;
-    }
+    initializeTextRenderer(textRenderer);
 
     double previousTime = glfwGetTime();
     glm::mat4 model;
@@ -748,12 +783,15 @@ int main(int argc, char *argv[])
         glm::mat4 mvp;
         const int maxUpdates = 5; // Prevent spiral of death
         int updates = 0;
+
+        // Update cube position and orientations
         while (accumulator >= fixedDeltaTime && updates < maxUpdates)
         {
             updateCube(window, model, mvp, width, height, ratio, (float)fixedDeltaTime, planes);
             accumulator -= fixedDeltaTime;
             updates++;
         }
+
         // Clear the screen
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -762,7 +800,27 @@ int main(int argc, char *argv[])
         renderScene(window, program, mvp_location, cubeVAO, cubeEBO, planes, model, ratio);
 
         // Render ImGui
-        renderImGui();
+        if (showDebugGUI)
+        {
+            renderImGui();
+        }
+
+        // if exitmode is true then exit the program
+        if (exitFlag)
+        {
+            // Cleanup
+            cleanup(program, cubeVAO, cubeVBO, cubeEBO, planes);
+
+            ImGui_ImplOpenGL3_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+            glDeleteShader(vertex_shader);
+            glDeleteShader(fragment_shader);
+
+            glfwDestroyWindow(window);
+            glfwTerminate();
+            return 0;
+        }
 
         glEnable(GL_DEPTH_TEST); // Re-enable depth test for next frame
 
@@ -782,5 +840,7 @@ int main(int argc, char *argv[])
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
+    glfwDestroyWindow(window);
+    glfwTerminate();
     return 0;
 }

@@ -156,7 +156,6 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include)
 # Add your source files
 add_executable(${PROJECT_NAME}
     src/main.cpp
-    src/render/text/text_renderer.cpp
 )
 
 # Include directories
@@ -192,6 +191,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/resources"
         "${CMAKE_BINARY_DIR}/bin/Release/resources"
-        COMMAND ${CMAKE_COMMAND} -E echo "Copying resources to ${CMAKE_BINARY_DIR}/bin/Release/resources"
+        # display status message in col
+        COMMAND ${CMAKE_COMMAND} -E echo "Copying resources -> ${CMAKE_BINARY_DIR}/bin/Release/resources"
     )
 endif()
