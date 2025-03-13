@@ -33,6 +33,8 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 
 // Mouse callback for camera rotation
 static glm::vec2 rotationAngles(0.0f, 0.0f);
+// Global variables
+static glm::vec2 mouseDelta(0.0f);
 
 static void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 {
@@ -44,6 +46,13 @@ static void mouse_callback(GLFWwindow *window, double xpos, double ypos)
         lastPos = glm::vec2(xpos, ypos);
         firstMouse = false;
     }
+    
+    glm::vec2 currentMousePos(xpos, ypos);
+    if (lastPos != glm::vec2(0.0f)) // Skip first frame
+    {
+        mouseDelta += currentMousePos - lastPos;
+    }
+    lastPos = currentMousePos;
 
     glm::vec2 currentPos(xpos, ypos);
     glm::vec2 delta = currentPos - lastPos;
@@ -62,7 +71,5 @@ static void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     // Capture mouse for continuous movement
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
-
-
 
 #endif /* MOUSE_CALLBACK_H */

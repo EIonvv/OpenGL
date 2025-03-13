@@ -230,7 +230,7 @@ GLFWwindow *initializeWindow()
         exit(EXIT_FAILURE);
     }
 
-    glfwSwapInterval(0);
+    glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
     return window;
 }
@@ -255,7 +255,7 @@ void initializeTextRenderer()
 }
 
 // Handle input and update cube state
-void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio, double deltaTime)
+void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio, float deltaTime)
 {
     ZoneScoped; // Tracy: Profile this function
     // Camera and cube movement
@@ -308,8 +308,12 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
             cameraPos += right * speed;
     }
 
-    // Optional: Use arrow keys for rotation (pitch and yaw)
-    float rotationSpeed = 60.0f * static_cast<float>(deltaTime); // 60 degrees per second
+    // Smooth rotation with mouse
+    float rotationSpeed = 1.0f;                               // Degrees per second per pixel
+    rotationAngles.y += static_cast<float>(mouseDelta.x) * rotationSpeed * deltaTime; // Yaw
+    rotationAngles.x -= static_cast<float>(mouseDelta.y) * rotationSpeed * deltaTime; // Pitch (inverted)
+    mouseDelta *= 0.9f;
+    // Dampen delta over time (adjustable)
     if (pressing_up)
         rotationAngles.x -= rotationSpeed; // Pitch up
     if (pressing_down)
@@ -319,7 +323,7 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
     if (pressing_right)
         rotationAngles.y += rotationSpeed; // Yaw right
 
-    // Clamp pitch to avoid flipping
+    // Clamp pitch
     rotationAngles.x = glm::clamp(rotationAngles.x, -89.0f, 89.0f);
 
     if (!cubePOVMode)
@@ -386,24 +390,19 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
 }
 
 // Calculate FPS and enforce frame rate
-void updateFrameTiming(double &previousTime, double &deltaTime)
+void updateFrameTiming(double &previousTime, double &deltaTime, double &accumulator)
 {
     ZoneScoped; // Tracy: Profile this function
     double currentTime = glfwGetTime();
     deltaTime = currentTime - previousTime;
-
-    // Enforce stable frame rate
-    if (deltaTime < targetFrameTime)
-    {
-        double sleepTime = (targetFrameTime - deltaTime) * 1000.0;
-        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(sleepTime)));
-        currentTime = glfwGetTime();
-        deltaTime = currentTime - previousTime;
-    }
-
     previousTime = currentTime;
 
-    // FPS calculation (keep this lightweight)
+    // Cap deltaTime to avoid large jumps (e.g., when window is moved)
+    deltaTime = std::min(deltaTime, 0.1); // Max 100ms per frame
+
+    accumulator += deltaTime;
+
+    // FPS calculation
     frameCount++;
     if (currentTime - lastTime >= 1.0)
     {
@@ -575,25 +574,29 @@ int main(int argc, char *argv[])
 
     double previousTime = glfwGetTime();
     glm::mat4 model;
+    double accumulator = 0.0;
+    const double fixedDeltaTime = 1.0 / 60.0; // Fixed 60 Hz update rate for physics/movement
 
     while (!glfwWindowShouldClose(window))
     {
         ZoneScoped; // Tracy: Profile the main loop iteration
-        double currentTime = glfwGetTime();
-        double deltaTime = currentTime - previousTime;
-        if (deltaTime < targetFrameTime)
-        {
-            double sleepTime = (targetFrameTime - deltaTime) * 1000.0;
-            std::this_thread::sleep_for(std::chrono::milliseconds((int)sleepTime));
-        }
-        updateFrameTiming(previousTime, deltaTime);
+        double deltaTime;
+
+        updateFrameTiming(previousTime, deltaTime, accumulator);
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         float ratio = width / (float)height;
 
         glm::mat4 mvp;
-        updateCube(window, model, mvp, width, height, ratio, deltaTime);
+
+        // Process updates in fixed steps
+        while (accumulator >= fixedDeltaTime)
+        {
+            updateCube(window, model, mvp, width, height, ratio, (float)fixedDeltaTime);
+            accumulator -= fixedDeltaTime;
+        }
+        
         renderScene(window, program, mvp_location, vertex_array, element_buffer,
                     planeVertexArray, planeElementBuffer, model, ratio);
 
