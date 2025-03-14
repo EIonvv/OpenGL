@@ -9,7 +9,7 @@
 #include <base64/base64.h>
 #include "vertex/vertex.h"
 #include "texture/texture.h"
-#include "../config.h"
+#include "../globals.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>

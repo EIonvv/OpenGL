@@ -28,7 +28,7 @@
 #include "render/vertex/vertex.h"
 #include "render/text/text_renderer.h"
 #include "render/texture/texture.h"
-#include "config.h"
+#include "globals.h"
 
 #ifdef min
 #undef min
@@ -40,18 +40,7 @@
 #include "stb_image/stb_image.h"
 #include "render/setupRenderer.h"
 #include <imgui_impl_opengl3.h>
-
-// Global variables
-static glm::vec3 SquarePos(0.0f);
-static glm::vec2 lastMousePos(0.0f);
-static double lastTime = 0.0;
-static int frameCount = 0;
-static double currentFPS = 0.0;
-static TextRenderer *textRenderer = nullptr;
-static glm::vec3 cameraPos = glm::vec3(0.0f, 5.0f, 10.0f);
-static bool cubePOVMode = false;
-static bool isColliding = false;
-static int collidingPlaneIndex = -1;
+#include "render/imGui/debug_imgui.h"
 
 // Plane structure
 struct Plane
@@ -275,55 +264,6 @@ bool isCubeCollidingWithPlane(const glm::mat4 &model, const std::vector<Plane> &
     return false;
 }
 
-// Initialize GLFW and OpenGL
-GLFWwindow *initializeWindow()
-{
-    ZoneScoped; // Tracy: Profile this function
-
-    glfwSetErrorCallback([](int error, const char *description)
-                         { spdlog::error("GLFW Error {}: {}", error, description); });
-
-    if (!glfwInit())
-    {
-        spdlog::critical("Failed to initialize GLFW. Terminating program.");
-        glfwTerminate();    // Ensure GLFW is terminated even on failure
-        exit(EXIT_FAILURE); // Exit with failure code
-    }
-
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    GLFWwindow *window = glfwCreateWindow(800, 600, "3D Draggable Cube", NULL, NULL);
-    if (!window)
-    {
-        spdlog::error("Failed to create GLFW window. Possible reasons include lack of OpenGL context or incompatible hardware.");
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
-
-    glfwSetWindowSizeLimits(window, 320, 240, GLFW_DONT_CARE, GLFW_DONT_CARE);
-    glfwMakeContextCurrent(window);
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        spdlog::error("Failed to initialize GLAD");
-        glfwDestroyWindow(window); // Clean up window before terminating
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
-
-    glEnable(GL_BLEND);
-    glfwSwapInterval(1);
-    glEnable(GL_DEPTH_TEST);
-
-    spdlog::info("GLFW and OpenGL initialized successfully.");
-    return window;
-}
-
 // Simple gravity function
 void SimpleGravity(float deltaTime, glm::mat4 &model, const std::vector<Plane> &planes)
 {
@@ -400,6 +340,12 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         speed = deltaTime * 3.0f;
         SquarePos.y = -0.5f;
         cameraPos = SquarePos + glm::vec3(0.0f, 0.5f, 0.0f);
+    }
+
+    // if delta time is too high, slow down the movement
+    if (deltaTime > 0.1f)
+    {
+        speed = baseSpeed * 0.1f;
     }
 
     if (pressing_w)
@@ -499,6 +445,7 @@ void updateFrameTiming(double &previousTime, double &deltaTime, double &accumula
         lastTime = currentTime;
     }
 }
+
 // Render scene
 void renderScene(GLFWwindow *window, GLuint program, GLint mvp_location, GLuint cubeVAO, GLuint cubeEBO, const std::vector<Plane> &planes, const glm::mat4 &model, float ratio)
 {
@@ -596,45 +543,55 @@ void cleanup(GLuint program, GLuint cubeVAO, GLuint cubeVBO, GLuint cubeEBO, std
     glfwTerminate();
 }
 
-static void renderImGui()
+// Initialize GLFW and OpenGL
+GLFWwindow *initializeWindow()
 {
-    // Start ImGui frame
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+    ZoneScoped; // Tracy: Profile this function
 
-    // clang-format off
-    // ImGui window
-    ImGui::Begin("Debug Window");
-    ImGui::Text("FPS:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%.1f", currentFPS);
-    ImGui::Text("OpenGL:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", glGetString(GL_VERSION));
-    ImGui::Text("GPU:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "%s", glGetString(GL_RENDERER));
-    ImGui::Text("Cube Rotation:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "(%.1f, %.1f)", rotationAngles.x, rotationAngles.y);
-    ImGui::Text("Cube Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(%.2f, %.2f, %.2f)", SquarePos.x, SquarePos.y, SquarePos.z);
-    ImGui::Text("Camera Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.5f, 0.0f, 0.5f, 1.0f), "(%.2f, %.2f, %.2f)", cameraPos.x, cameraPos.y, cameraPos.z);
-    if (isColliding && cubePOVMode)
-    {
-        ImGui::Text("Box Collision:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s with plane %d", isColliding ? "Colliding" : "Not colliding", collidingPlaneIndex);
-    }
-    // clang-format on
+    glfwSetErrorCallback([](int error, const char *description)
+                         { spdlog::error("GLFW Error {}: {}", error, description); });
 
-    // Set button style for dark mode
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));        // Dark gray color
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // Lighter gray when hovered
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));  // Darker gray when active
-    if (ImGui::Button("Toggle Cube POV Mode"))
+    if (!glfwInit())
     {
-        cubePOVMode = !cubePOVMode;
+        spdlog::critical("Failed to initialize GLFW. Terminating program.");
+        glfwTerminate();    // Ensure GLFW is terminated even on failure
+        exit(EXIT_FAILURE); // Exit with failure code
     }
 
-    ImGui::PopStyleColor(3); // Pop the three style colors
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    ImGui::End();
+    GLFWwindow *window = glfwCreateWindow(800, 600, "3D Draggable Cube", NULL, NULL);
+    if (!window)
+    {
+        spdlog::error("Failed to create GLFW window. Possible reasons include lack of OpenGL context or incompatible hardware.");
+        glfwTerminate();
+        exit(EXIT_FAILURE);
+    }
 
-    // Render ImGui
-    glDisable(GL_DEPTH_TEST); // Disable depth test for ImGui
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    glfwSetWindowSizeLimits(window, 320, 240, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    glfwMakeContextCurrent(window);
+    glfwSetKeyCallback(window, key_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        spdlog::error("Failed to initialize GLAD");
+        glfwDestroyWindow(window); // Clean up window before terminating
+        glfwTerminate();
+        exit(EXIT_FAILURE);
+    }
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glfwSwapInterval(1);
+    glEnable(GL_DEPTH_TEST);
+
+    spdlog::info("GLFW and OpenGL initialized successfully.");
+
+    return window;
 }
 
 // Main function

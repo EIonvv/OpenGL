@@ -1,4 +1,5 @@
 add_subdirectory(imGui)
+add_subdirectory(text)
 add_subdirectory(texture)
 add_subdirectory(vertex)
 

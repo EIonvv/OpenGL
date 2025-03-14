@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include "../../render/text/text_renderer.h"
 #include <imgui_impl_opengl3.h> // Add this include for ImGui_ImplOpenGL3_Shutdown
-#include "../../config.h"
+#include "../../globals.h"
 
 // Declare external variables
 extern bool cubePOVMode; // Add this to access cubePOVMode from main.cpp
