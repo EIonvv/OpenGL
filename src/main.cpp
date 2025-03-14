@@ -628,8 +628,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // Setup ImGui style
-    ImGui::StyleColorsDark();
+    // Setup ImGui style    
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330 core");
 
@@ -692,20 +691,19 @@ int main(int argc, char *argv[])
     glEnableVertexAttribArray(vtex_location);
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
-    // Generate planes
+    // Generate planes  
     std::vector<Plane> planes;
 
     planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, 0.0f, 0.0f)}); // Ground plane
 
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // Back plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // Front plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // Right plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // Left plane
-
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // back right plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // back left plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // front right plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // front left plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});    // Back plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // back right
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});    // Right plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // front right
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // Front plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // front left
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // Left plane
+    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // back left
 
     // Setup plane buffers
     for (auto &plane : planes)
@@ -731,7 +729,6 @@ int main(int argc, char *argv[])
     glm::mat4 model;
     double accumulator = 0.0;
     const double fixedDeltaTime = 1.0 / 60.0f;
-
 
     while (!glfwWindowShouldClose(window))
     {
@@ -789,7 +786,7 @@ int main(int argc, char *argv[])
     ImGui::DestroyContext();
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
-    
+
     if (window)
     {
         glfwDestroyWindow(window);
