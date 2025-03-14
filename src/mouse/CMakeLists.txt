@@ -1,2 +1,1 @@
-add_subdirectory(mouse_callback)
 add_subdirectory(mouse_position)

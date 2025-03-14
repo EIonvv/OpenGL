@@ -3,10 +3,11 @@
 
 #include <glm/glm.hpp>
 
-struct Vertex {
+struct Vertex
+{
     float pos[3];
     float col[3];
-    float texCoord[2];  // Added texture coordinates
+    float texCoord[2]; // Added texture coordinates
 };
 
 #endif /* VERTEX_H */

@@ -152,10 +152,9 @@ void SimpleGravity(float deltaTime, glm::mat4 &model, const std::vector<Plane> &
     model = glm::translate(glm::mat4(1.0f), SquarePos);                  // Update model matrix after gravity
 }
 
-// Update cube position and orientation
+// Update cube
 void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio, float deltaTime, const std::vector<Plane> &planes)
 {
-
     float baseSpeed = deltaTime * 12.0f;
     float speed = baseSpeed;
 
@@ -175,12 +174,12 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         cameraPos = SquarePos + glm::vec3(0.0f, 0.5f, 0.0f);
     }
 
-    // if delta time is too high, slow down the movement
     if (deltaTime > 0.1f)
     {
         speed = baseSpeed * 0.1f;
     }
 
+    // Existing movement controls
     if (pressing_w)
     {
         if (cubePOVMode)
@@ -212,7 +211,6 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
 
     float rotationSpeed = 1.0f;
 
-    // if f2pressed then enable movement of the camera
     if (mouseInputEnabled)
     {
         rotationAngles.y += static_cast<float>(mouseDelta.x) * rotationSpeed * deltaTime;
@@ -230,7 +228,49 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         rotationAngles.y += rotationSpeed;
 
     rotationAngles.x = glm::clamp(rotationAngles.x, -89.0f, 89.0f);
+    
+    // Wandering behavior when not in cubePOVMode and colliding with a plane
+    if (!cubePOVMode && isCubeCollidingWithPlane(model, planes, collidingPlaneIndex))
+    {
+        // Update wander timer
+        wanderTimer += deltaTime;
+        if (wanderTimer >= wanderChangeInterval)
+        {
+            // Randomize a new direction (on the XZ plane for flat movement)
+            float randomAngle = static_cast<float>(rand()) / RAND_MAX * 360.0f; // Random angle in degrees
+            wanderDirection = glm::normalize(glm::vec3(cos(glm::radians(randomAngle)), 0.0f, sin(glm::radians(randomAngle))));
+            wanderTimer = 0.0f; // Reset timer
+        }
 
+        // Move the cube in the wander direction
+        float wanderSpeed = 2.0f; // Adjust speed as needed
+        glm::vec3 newPos = SquarePos + wanderDirection * wanderSpeed * deltaTime;
+
+        // Ensure the cube stays within plane bounds (simple boundary check)
+        for (const auto &plane : planes)
+        {
+            // Calculate the vertices of the plane
+            glm::vec3 bottomLeft = glm::make_vec3(plane.vertices[0].pos);
+            glm::vec3 bottomRight = glm::make_vec3(plane.vertices[1].pos);
+            glm::vec3 topRight = glm::make_vec3(plane.vertices[2].pos);
+            glm::vec3 topLeft = glm::make_vec3(plane.vertices[3].pos);
+
+
+            // Check if the new position is within the plane bounds
+            if (newPos.x >= bottomLeft.x && newPos.x <= bottomRight.x &&
+                newPos.z >= bottomLeft.z && newPos.z <= topLeft.z)
+            {
+                SquarePos = newPos; // Update position
+                break;
+            }
+
+            
+        }
+
+        SquarePos = newPos; // Update position
+    }
+
+    // Existing dragging logic
     if (!cubePOVMode)
     {
         glm::vec2 mousePos = GetMouse::getMousePosition(window);
@@ -486,7 +526,6 @@ int main(int argc, char *argv[])
     double previousTime = glfwGetTime();
     glm::mat4 model;
     double accumulator = 0.0;
-    const double fixedDeltaTime = 1.0 / 60.0f;
 
     while (!glfwWindowShouldClose(window))
     {

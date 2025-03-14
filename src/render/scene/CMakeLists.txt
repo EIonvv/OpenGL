@@ -3,5 +3,3 @@ target_sources(
     PRIVATE
     render_scene.h
 )
-
-add_subdirectory(structures)

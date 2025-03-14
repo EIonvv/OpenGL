@@ -136,10 +136,8 @@ target_include_directories(glad PUBLIC ${GLAD_DIR})
 # Ensure the include directory exists
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include)
 
-# Add your source files
-add_executable(${PROJECT_NAME}
-    src/main.cpp
-)
+# Add the executable
+add_executable(${PROJECT_NAME} src/main.cpp)
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -148,7 +146,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${GLAD_DIR}
     ${cpp-base64_SOURCE_DIR}
     ${IMGUI_DIR}  # Include ImGui headers
-    ${IMGUI_DIR}/backends
 )
 
 # Link libraries
