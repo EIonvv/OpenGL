@@ -1,18 +1,15 @@
 #ifndef TEXT_RENDERER_H
 #define TEXT_RENDERER_H
 
-#include <spdlog/spdlog.h>
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <ft2build.h>
 #include FT_FREETYPE_H
-#include <map>
+#include <spdlog/spdlog.h>
 #include <string>
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <stdexcept>
-#include <GLFW/glfw3.h>
+#include <map>
 
 static const char *vertexShaderSource = R"(
     #version 330 core
@@ -39,16 +36,19 @@ static const char *fragmentShaderSource = R"(
     }
     )";
 
+struct Character
+{
+    GLuint textureID;   // ID handle of the glyph texture
+    glm::ivec2 size;    // Size of glyph
+    glm::ivec2 bearing; // Offset from baseline to left/top of glyph
+    GLuint advance;     // Offset to advance to next glyph
+};
+
 class TextRenderer
 {
 public:
-    struct Character
-    {
-        GLuint textureID;
-        glm::ivec2 size;
-        glm::ivec2 bearing;
-        GLuint advance;
-    };
+    std::map<GLchar, Character> characters;
+    GLuint VAO, VBO, shaderProgram;
 
     TextRenderer(const char *fontPath, GLuint fontSize)
     {
@@ -130,9 +130,10 @@ public:
             glDeleteTextures(1, &charPair.second.textureID);
         }
     }
-    
+
     void renderText(std::string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
     {
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDisable(GL_DEPTH_TEST);
@@ -143,7 +144,6 @@ public:
         glUniform3fv(textColorLoc, 1, glm::value_ptr(color));
 
         GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
-        // get the current window size
         int width, height;
         glfwGetWindowSize(glfwGetCurrentContext(), &width, &height);
         glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(width), 0.0f, static_cast<GLfloat>(height));
@@ -186,10 +186,6 @@ public:
     }
 
 private:
-    std::map<GLchar, Character> characters;
-    GLuint VAO, VBO;
-    GLuint shaderProgram;
-
     void initializeShader()
     {
         GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -210,4 +206,4 @@ private:
     }
 };
 
-#endif /* TEXT_RENDERER_H */
+#endif // TEXT_RENDERER_H

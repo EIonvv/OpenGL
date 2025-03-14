@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(
     OpenGLRendering
     VERSION 1.0.0
-    DESCRIPTION "OpenGL Text Rendering"
+    DESCRIPTION "OpenGL Text Rendering with ImGui"
     LANGUAGES CXX C
 )
 
@@ -18,6 +18,9 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # Enable FetchContent
 include(FetchContent)
+
+# Find Python3 for resource generation
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # GLFW
 find_package(glfw3 QUIET)
@@ -96,6 +99,33 @@ if(NOT cpp-base64_POPULATED)
     target_include_directories(cpp-base64 INTERFACE ${cpp-base64_SOURCE_DIR})
 endif()
 
+# ImGui (header-only library with backends)
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.91.4  # Use the latest stable version as of March 2025
+)
+FetchContent_MakeAvailable(imgui)
+
+# Add ImGui as a library with necessary source files
+set(IMGUI_DIR ${imgui_SOURCE_DIR})
+add_library(imgui STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+)
+target_link_libraries(imgui PUBLIC
+    glfw
+    glad  # For OpenGL functions
+)
+
 # Add GLAD source files
 set(GLAD_DIR ${CMAKE_SOURCE_DIR}/include/glad)
 add_library(glad STATIC
@@ -107,17 +137,18 @@ target_include_directories(glad PUBLIC ${GLAD_DIR})
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include)
 
 # Add your source files
-add_executable(
-    ${PROJECT_NAME}
+add_executable(${PROJECT_NAME}
     src/main.cpp
 )
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     include
-    ${CMAKE_BINARY_DIR}/include  # Include the directory with resources.h
+    ${CMAKE_BINARY_DIR}/include
     ${GLAD_DIR}
     ${cpp-base64_SOURCE_DIR}
+    ${IMGUI_DIR}  # Include ImGui headers
+    ${IMGUI_DIR}/backends
 )
 
 # Link libraries
@@ -127,6 +158,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     spdlog::spdlog
     freetype
+    imgui  # Link ImGui
     ${CMAKE_DL_LIBS}
 )
 
@@ -137,10 +169,17 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # Copy the src/resources/ folder to the output directory after building (optional fallback)
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    # delete the old resources folder
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove_directory
+        "${CMAKE_BINARY_DIR}/bin/resources"
+    )
+    # copy the new resources folder
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/src/resources"
+        "${CMAKE_SOURCE_DIR}/resources"
         "${CMAKE_BINARY_DIR}/bin/Release/resources"
-        COMMAND ${CMAKE_COMMAND} -E echo "Copying resources to ${CMAKE_BINARY_DIR}/bin/Release/resources"
+        # display status message in col
+        COMMAND ${CMAKE_COMMAND} -E echo "Copying resources -> ${CMAKE_BINARY_DIR}/bin/Release/resources"
     )
 endif()

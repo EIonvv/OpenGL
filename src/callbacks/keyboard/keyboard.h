@@ -6,22 +6,32 @@
 #include <GLFW/glfw3.h>
 #include <unordered_map>
 #include "../../render/text/text_renderer.h"
-#include "../../config.h"
+#include <imgui_impl_opengl3.h> // Add this include for ImGui_ImplOpenGL3_Shutdown
+#include "../../globals.h"
 
 // Declare external variables
 extern bool cubePOVMode; // Add this to access cubePOVMode from main.cpp
 
 static TextRenderer *keyboardTextRenderer = nullptr;
-static bool renderDebugText = false; // Flag to control debug text rendering
-static bool pressing_w = false;      // Flag to control walking forward
-static bool pressing_s = false;      // Flag to control walking backward
-static bool pressing_a = false;      // Flag to control walking left
-static bool pressing_d = false;      // Flag to control walking right
-static bool pressing_v = false;      // Flag to control cube POV mode toggle
-static bool pressing_up = false;     // Flag to control looking up
-static bool pressing_down = false;   // Flag to control looking down
-static bool pressing_left = false;   // Flag to control looking left
-static bool pressing_right = false;  // Flag to control looking right
+static bool showDebugGUI = false; // Flag to control debug text rendering
+
+static bool exitFlag = false; // Flag to control exit
+
+static bool pressing_w = false;  // Flag to control walking forward
+static bool pressing_s = false;  // Flag to control walking backward
+static bool pressing_a = false;  // Flag to control walking left
+static bool pressing_d = false;  // Flag to control walking right
+static bool pressing_v = false;  // Flag to control cube POV mode toggle
+static bool pressing_f2 = false; // Flag to control debug mode toggle
+
+static bool pressing_up = false;    // Flag to control looking up
+static bool pressing_down = false;  // Flag to control looking down
+static bool pressing_left = false;  // Flag to control looking left
+static bool pressing_right = false; // Flag to control looking right
+
+static bool vPressedLastFrame = false; // Flag to track if 'V' was pressed last frame
+
+static bool mouseInputEnabled = false; // Flag to control mouse input
 
 // Key state tracking structure
 struct KeyState
@@ -111,8 +121,7 @@ static const std::unordered_map<int, std::pair<std::string, std::string>> keyMap
     {GLFW_KEY_UP, {"[UP]", "[UP]"}},
     {GLFW_KEY_DOWN, {"[DOWN]", "[DOWN]"}},
     {GLFW_KEY_LEFT, {"[LEFT]", "[LEFT]"}},
-    {GLFW_KEY_RIGHT, {"[RIGHT]", "[RIGHT]"}}
-};
+    {GLFW_KEY_RIGHT, {"[RIGHT]", "[RIGHT]"}}};
 
 // Updated key_callback with cubePOVMode toggle
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -120,17 +129,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
     const char *actionStr = (action == GLFW_PRESS) ? "pressed" : (action == GLFW_RELEASE) ? "released"
                                                                                           : "repeated";
 
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    {
-        spdlog::info("Escape key pressed. Closing the window...");
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-        KeyState::pressedKeys.clear();
-        KeyState::keyStates.clear();
-        return;
-    }
-
     // Toggle cube POV mode when 'V' is pressed
-    static bool vPressedLastFrame = false;
     if (key == GLFW_KEY_V && action == GLFW_PRESS && !vPressedLastFrame)
     {
         cubePOVMode = !cubePOVMode;
@@ -151,6 +150,9 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
         break;
     case GLFW_KEY_D:
         pressing_d = (action != GLFW_RELEASE);
+        break;
+    case GLFW_KEY_ESCAPE:
+        exitFlag = true;
         break;
     // Arrow keys
     case GLFW_KEY_UP:
@@ -173,10 +175,45 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
     {
         mode = (mode == debug) ? release : debug;
         spdlog::info("Switching to {} mode", (mode == debug) ? "debug" : "release");
-        renderDebugText = (mode == debug); // Toggle debug text rendering
+        showDebugGUI = (mode == debug); // Toggle debug text rendering
         KeyState::pressedKeys.clear();
         KeyState::keyStates.clear();
         return;
+    }
+    // if f2 is pressed, capture cursor to window toggle the cursor input
+    if (key == GLFW_KEY_F2 && action == GLFW_PRESS)
+    {
+        mouseInputEnabled = !mouseInputEnabled;
+        spdlog::info("Mouse input {}abled", mouseInputEnabled ? "en" : "dis");
+        glfwSetInputMode(window, GLFW_CURSOR, mouseInputEnabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    }
+
+    // if ESCAPE exit the program
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    {
+
+        // Cleanup
+        glfwDestroyWindow(window);
+        spdlog::info("Shutting down ImGui...");
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        ImGui_ImplOpenGL3_Shutdown();
+        spdlog::info("Shutting down ImGui GLFW...");
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        ImGui_ImplGlfw_Shutdown();
+        spdlog::info("Destroying ImGui context...");
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        ImGui::DestroyContext();
+        spdlog::info("Deleting shaders...");
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        glfwTerminate();
+        spdlog::info("Exiting program...");
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        exit(EXIT_SUCCESS);
     }
 
     KeyState::keyStates[key] = (action != GLFW_RELEASE);
