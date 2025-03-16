@@ -42,7 +42,43 @@
 #include <imgui_impl_opengl3.h>
 #include "render/imGui/debug_imgui.h"
 #include "render/scene/render_scene.h"
+#include "render/shader/shader.h"
+#include "render/scene/structures/cube/cube_struct.h"
 
+#include <unordered_map>
+
+// Define a simple 2D grid position (x, z) for tracking
+struct GridPos
+{
+    int x, z;
+    bool operator==(const GridPos &other) const
+    {
+        return x == other.x && z == other.z;
+    }
+};
+
+// Hash function for GridPos to use in unordered_map
+struct GridPosHash
+{
+    std::size_t operator()(const GridPos &pos) const
+    {
+        return std::hash<int>()(pos.x) ^ (std::hash<int>()(pos.z) << 1);
+    }
+};
+
+// Bounding Box structure
+struct BoundingBox {
+    glm::vec3 min, max;
+};
+
+// Global world bounds
+BoundingBox worldBounds;
+
+// Map to store visit counts for each grid cell
+std::unordered_map<GridPos, int, GridPosHash> visitedAreas;
+
+// Grid cell size (adjust based on your world scale)
+const float GRID_CELL_SIZE = 1.0f;
 
 // Error callback
 static void error_callback(int error, const char *description)
@@ -53,7 +89,6 @@ static void error_callback(int error, const char *description)
 // Generate plane vertices with rotation
 std::vector<Vertex> generatePlaneVertices(float width, float depth, const glm::vec3 &position, const glm::vec3 &rotation)
 {
-
     std::vector<Vertex> vertices(4);
     float halfWidth = width / 2.0f;
     float halfDepth = depth / 2.0f;
@@ -67,10 +102,15 @@ std::vector<Vertex> generatePlaneVertices(float width, float depth, const glm::v
     glm::vec4 topRight = rotationMatrix * glm::vec4(halfWidth, 0.0f, halfDepth, 1.0f);
     glm::vec4 topLeft = rotationMatrix * glm::vec4(-halfWidth, 0.0f, halfDepth, 1.0f);
 
-    vertices[0] = {{position.x + bottomLeft.x, position.y + bottomLeft.y, position.z + bottomLeft.z}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}};    // Bottom-left
-    vertices[1] = {{position.x + bottomRight.x, position.y + bottomRight.y, position.z + bottomRight.z}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}}; // Bottom-right
-    vertices[2] = {{position.x + topRight.x, position.y + topRight.y, position.z + topRight.z}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}};          // Top-right
-    vertices[3] = {{position.x + topLeft.x, position.y + topLeft.y, position.z + topLeft.z}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}};             // Top-left
+    vertices[0] = {{position.x + bottomLeft.x, position.y + bottomLeft.y, position.z + bottomLeft.z}, {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}};
+    vertices[1] = {{position.x + bottomRight.x, position.y + bottomRight.y, position.z + bottomRight.z}, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}};
+    vertices[2] = {{position.x + topRight.x, position.y + topRight.y, position.z + topRight.z}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}};
+    vertices[3] = {{position.x + topLeft.x, position.y + topLeft.y, position.z + topLeft.z}, {0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}};
+
+    spdlog::info("Bottom-left: ({}, {}, {})", position.x + bottomLeft.x, position.y + bottomLeft.y, position.z + bottomLeft.z);
+    spdlog::info("Bottom-right: ({}, {}, {})", position.x + bottomRight.x, position.y + bottomRight.y, position.z + bottomRight.z);
+    spdlog::info("Top-right: ({}, {}, {})", position.x + topRight.x, position.y + topRight.y, position.z + topRight.z);
+    spdlog::info("Top-left: ({}, {}, {})", position.x + topLeft.x, position.y + topLeft.y, position.z + topLeft.z);
 
     return vertices;
 }
@@ -78,7 +118,6 @@ std::vector<Vertex> generatePlaneVertices(float width, float depth, const glm::v
 // Setup plane buffers
 void setupPlaneBuffers(Plane &plane, GLint vpos_location, GLint vcol_location, GLint vtex_location)
 {
-
     glGenVertexArrays(1, &plane.vao);
     glBindVertexArray(plane.vao);
 
@@ -101,25 +140,17 @@ void setupPlaneBuffers(Plane &plane, GLint vpos_location, GLint vcol_location, G
 // Simple gravity function
 void SimpleGravity(float deltaTime, glm::mat4 &model, const std::vector<Plane> &planes)
 {
-
-    // Default gravity direction (downward along Y-axis if no collision)
     glm::vec3 gravityDirection = glm::vec3(0.0f, -1.0f, 0.0f);
-    float gravityStrength = 9.8f; // Gravity acceleration (m/s^2), adjust as needed
+    float gravityStrength = 9.8f;
 
-    // Check for collision and adjust gravity direction if colliding
     if (isCubeCollidingWithPlane(model, planes, collidingPlaneIndex))
     {
         const Plane &collidingPlane = planes[collidingPlaneIndex];
-
-        // Calculate plane normal (using the snippet's method)
         glm::vec3 edge1 = glm::make_vec3(collidingPlane.vertices[1].pos) - glm::make_vec3(collidingPlane.vertices[0].pos);
         glm::vec3 edge2 = glm::make_vec3(collidingPlane.vertices[2].pos) - glm::make_vec3(collidingPlane.vertices[0].pos);
         glm::vec3 planeNormal = glm::normalize(glm::cross(edge1, edge2));
-
-        // Gravity acts opposite to the plane normal (downward relative to the plane)
         gravityDirection = -planeNormal;
 
-        // Calculate penetration depth and resolve collision
         std::array<glm::vec3, 8> cubeWorldVertices;
         for (int i = 0; i < 8; i++)
         {
@@ -133,30 +164,33 @@ void SimpleGravity(float deltaTime, glm::mat4 &model, const std::vector<Plane> &
         {
             glm::vec3 toVertex = vertex - glm::make_vec3(collidingPlane.vertices[0].pos);
             float distance = glm::dot(toVertex, planeNormal);
-            if (distance < 0.0f) // Vertex is below the plane
+            if (distance < 0.0f)
             {
                 minPenetration = std::min(minPenetration, std::abs(distance));
             }
         }
 
-        // Push the cube up along the plane normal by the penetration depth
         if (minPenetration != std::numeric_limits<float>::max())
         {
-            SquarePos += planeNormal * minPenetration * (float)deltaTime * 0.01f; // Scale for reasonable speed
-            model = glm::translate(glm::mat4(1.0f), SquarePos);                   // Update model matrix
+            SquarePos += planeNormal * minPenetration * (float)deltaTime * 0.01f;
+            model = glm::translate(glm::mat4(1.0f), SquarePos);
         }
     }
 
-    // Apply gravity
-    SquarePos += gravityDirection * gravityStrength * deltaTime * 0.01f; // Scale for reasonable speed
-    model = glm::translate(glm::mat4(1.0f), SquarePos);                  // Update model matrix after gravity
+    SquarePos += gravityDirection * gravityStrength * deltaTime * 0.01f;
+    model = glm::translate(glm::mat4(1.0f), SquarePos);
 }
 
-// Update cube
+// Update cube function with bounding box optimization
 void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width, int height, float ratio, float deltaTime, const std::vector<Plane> &planes)
 {
     float baseSpeed = deltaTime * 12.0f;
     float speed = baseSpeed;
+
+    if (isBoostActive)
+    {
+        speed *= BOOST_MULTIPLIER;
+    }
 
     glm::vec3 direction;
     direction.x = cos(glm::radians(rotationAngles.y)) * cos(glm::radians(rotationAngles.x));
@@ -167,11 +201,19 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
     glm::vec3 right = glm::normalize(glm::cross(direction, glm::vec3(0.0f, 1.0f, 0.0f)));
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
+    glm::vec3 previousPos = SquarePos;
+
     if (cubePOVMode)
     {
         speed = deltaTime * 3.0f;
-        SquarePos.y = -0.5f;
         cameraPos = SquarePos + glm::vec3(0.0f, 0.5f, 0.0f);
+
+        if (isCubeCollidingWithPlane(model, planes, collidingPlaneIndex))
+        {
+            SquarePos.y = -0.5f;
+        }
+
+        lastSquarePos = SquarePos;
     }
 
     if (deltaTime > 0.1f)
@@ -179,7 +221,13 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         speed = baseSpeed * 0.1f;
     }
 
-    // Existing movement controls
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !isBoostActive)
+    {
+        isBoostActive = true;
+        boostDistanceTraveled = 0.0f;
+        spdlog::info("Boost activated!");
+    }
+
     if (pressing_w)
     {
         if (cubePOVMode)
@@ -209,6 +257,18 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
             cameraPos += right * speed;
     }
 
+    float distanceThisFrame = glm::length(SquarePos - previousPos);
+
+    if (isBoostActive)
+    {
+        boostDistanceTraveled += distanceThisFrame;
+        if (boostDistanceTraveled >= BOOST_DURATION_DISTANCE)
+        {
+            isBoostActive = false;
+            spdlog::info("Boost deactivated after traveling {} units", boostDistanceTraveled);
+        }
+    }
+
     float rotationSpeed = 1.0f;
 
     if (mouseInputEnabled)
@@ -228,63 +288,84 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
         rotationAngles.y += rotationSpeed;
 
     rotationAngles.x = glm::clamp(rotationAngles.x, -89.0f, 89.0f);
-    
-    // Wandering behavior when not in cubePOVMode and colliding with a plane
-    if (!cubePOVMode && isCubeCollidingWithPlane(model, planes, collidingPlaneIndex))
-    {
-        // Update wander timer
-        wanderTimer += deltaTime;
-        if (wanderTimer >= wanderChangeInterval)
-        {
-            // Randomize a new direction (on the XZ plane for flat movement)
-            float randomAngle = static_cast<float>(rand()) / RAND_MAX * 360.0f; // Random angle in degrees
-            wanderDirection = glm::normalize(glm::vec3(cos(glm::radians(randomAngle)), 0.0f, sin(glm::radians(randomAngle))));
-            wanderTimer = 0.0f; // Reset timer
-        }
-
-        // Move the cube in the wander direction
-        float wanderSpeed = 2.0f; // Adjust speed as needed
-        glm::vec3 newPos = SquarePos + wanderDirection * wanderSpeed * deltaTime;
-
-        // Ensure the cube stays within plane bounds (simple boundary check)
-        for (const auto &plane : planes)
-        {
-            // Calculate the vertices of the plane
-            glm::vec3 bottomLeft = glm::make_vec3(plane.vertices[0].pos);
-            glm::vec3 bottomRight = glm::make_vec3(plane.vertices[1].pos);
-            glm::vec3 topRight = glm::make_vec3(plane.vertices[2].pos);
-            glm::vec3 topLeft = glm::make_vec3(plane.vertices[3].pos);
-
-
-            // Check if the new position is within the plane bounds
-            if (newPos.x >= bottomLeft.x && newPos.x <= bottomRight.x &&
-                newPos.z >= bottomLeft.z && newPos.z <= topLeft.z)
-            {
-                SquarePos = newPos; // Update position
-                break;
-            }
-
-            
-        }
-
-        SquarePos = newPos; // Update position
-    }
-
-    // Existing dragging logic
-    if (!cubePOVMode)
-    {
-        glm::vec2 mousePos = GetMouse::getMousePosition(window);
-        bool isMouseOverCube = isPointInCube(mousePos, mvp, width, height);
-        if (isDragging && isMouseOverCube)
-        {
-            glm::vec2 delta = mousePos - lastMousePos;
-            SquarePos.x += delta.x * 0.002f * deltaTime * 60.0f;
-            SquarePos.z -= delta.y * glm::clamp(0.002f * ratio, 0.002f, 0.01f) * deltaTime * 60.0f;
-        }
-        lastMousePos = mousePos;
-    }
 
     SimpleGravity(deltaTime, model, planes);
+
+    if (!cubePOVMode)
+    {
+        wanderTimer += deltaTime;
+
+        static glm::vec3 currentDirection = wanderDirection;
+        static glm::vec3 targetDirection = wanderDirection;
+        const float turnSpeed = 2.0f;
+        float wanderSpeed = 5.0f;
+
+        if (isBoostActive)
+        {
+            wanderSpeed *= BOOST_MULTIPLIER;
+        }
+
+        GridPos currentGridPos = {
+            static_cast<int>(std::floor(SquarePos.x / GRID_CELL_SIZE)),
+            static_cast<int>(std::floor(SquarePos.z / GRID_CELL_SIZE))};
+
+        visitedAreas[currentGridPos]++;
+
+        int visitCount = visitedAreas[currentGridPos];
+        float adjustedWanderSpeed = glm::clamp(2.0f / (1.0f + visitCount * 0.5f), 1.0f, 5.0f);
+        if (isBoostActive)
+        {
+            adjustedWanderSpeed *= BOOST_MULTIPLIER;
+        }
+        spdlog::info("Visit count at ({}, {}): {}, Speed: {}", currentGridPos.x, currentGridPos.z, visitCount, adjustedWanderSpeed);
+
+        if (wanderTimer >= wanderChangeInterval)
+        {
+            float randomAngle = static_cast<float>(rand()) / RAND_MAX * 360.0f;
+            glm::vec3 potentialTargetDirection = glm::normalize(glm::vec3(cos(glm::radians(randomAngle)), 0.0f, sin(glm::radians(randomAngle))));
+
+            glm::vec3 potentialNewPos = SquarePos + potentialTargetDirection * adjustedWanderSpeed * deltaTime;
+
+            // Check if potentialNewPos is within world bounds
+            if (potentialNewPos.x >= worldBounds.min.x && potentialNewPos.x <= worldBounds.max.x &&
+                potentialNewPos.z >= worldBounds.min.z && potentialNewPos.z <= worldBounds.max.z)
+            {
+                targetDirection = potentialTargetDirection;
+            }
+            else
+            {
+                targetDirection = -currentDirection;
+            }
+
+            wanderTimer = 0.0f;
+        }
+
+        currentDirection = glm::normalize(glm::mix(currentDirection, targetDirection, turnSpeed * deltaTime));
+        glm::vec3 newPos = SquarePos + currentDirection * adjustedWanderSpeed * deltaTime;
+
+        // Check if newPos is within world bounds
+        if (newPos.x >= worldBounds.min.x && newPos.x <= worldBounds.max.x &&
+            newPos.z >= worldBounds.min.z && newPos.z <= worldBounds.max.z)
+        {
+            SquarePos = newPos;
+        }
+        else
+        {
+            // If out of bounds, clamp to the nearest valid position and reflect direction
+            SquarePos.x = glm::clamp(newPos.x, worldBounds.min.x + 0.1f, worldBounds.max.x - 0.1f);
+            SquarePos.z = glm::clamp(newPos.z, worldBounds.min.z + 0.1f, worldBounds.max.z - 0.1f);
+            SquarePos.y = newPos.y;
+
+            glm::vec3 normal(0.0f, 0.0f, 0.0f);
+            if (newPos.x <= worldBounds.min.x) normal.x = 1.0f;
+            else if (newPos.x >= worldBounds.max.x) normal.x = -1.0f;
+            if (newPos.z <= worldBounds.min.z) normal.z = 1.0f;
+            else if (newPos.z >= worldBounds.max.z) normal.z = -1.0f;
+
+            currentDirection = glm::reflect(currentDirection, glm::normalize(normal));
+            targetDirection = currentDirection;
+        }
+    }
 
     model = glm::translate(glm::mat4(1.0f), SquarePos);
     model = glm::rotate(model, glm::radians(rotationAngles.x), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -303,7 +384,6 @@ void updateCube(GLFWwindow *window, glm::mat4 &model, glm::mat4 &mvp, int width,
 // Update frame timing
 void updateFrameTiming(double &previousTime, double &deltaTime, double &accumulator)
 {
-
     double currentTime = glfwGetTime();
     deltaTime = currentTime - previousTime;
     previousTime = currentTime;
@@ -322,7 +402,6 @@ void updateFrameTiming(double &previousTime, double &deltaTime, double &accumula
 // Cleanup
 void cleanup(GLuint program, GLuint cubeVAO, GLuint cubeVBO, GLuint cubeEBO, std::vector<Plane> &planes)
 {
-
     glDeleteTextures(1, &planeTexture);
     glDeleteTextures(1, &cubeTexture);
 
@@ -345,6 +424,10 @@ void cleanup(GLuint program, GLuint cubeVAO, GLuint cubeVBO, GLuint cubeEBO, std
 // Initialize GLFW and OpenGL
 GLFWwindow *initializeWindow()
 {
+    if (mode == release)
+    {
+        FreeConsole();
+    }
 
     glfwSetErrorCallback([](int error, const char *description)
                          { spdlog::error("GLFW Error {}: {}", error, description); });
@@ -352,13 +435,15 @@ GLFWwindow *initializeWindow()
     if (!glfwInit())
     {
         spdlog::critical("Failed to initialize GLFW. Terminating program.");
-        glfwTerminate();    // Ensure GLFW is terminated even on failure
-        exit(EXIT_FAILURE); // Exit with failure code
+        glfwTerminate();
+        exit(EXIT_FAILURE);
     }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_FALSE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     GLFWwindow *window = glfwCreateWindow(800, 600, "3D Draggable Cube", NULL, NULL);
     if (!window)
@@ -377,25 +462,22 @@ GLFWwindow *initializeWindow()
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         spdlog::error("Failed to initialize GLAD");
-        glfwDestroyWindow(window); // Clean up window before terminating
+        glfwDestroyWindow(window);
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // glEnable(GL_BLEND);
+    // glEnable(GL_DEPTH_TEST); // Enable depth testing once here
     glfwSwapInterval(1);
-    glEnable(GL_DEPTH_TEST);
 
     spdlog::info("GLFW and OpenGL initialized successfully.");
-
     return window;
 }
 
 // Main function
 int main(int argc, char *argv[])
 {
-    // Parse command-line arguments
     if (argc > 1)
     {
         targetFPS = std::atoi(argv[1]);
@@ -411,10 +493,11 @@ int main(int argc, char *argv[])
     rotationAngles.x = 45.0f;
     rotationAngles.y = 0.0f;
 
-    // Initialize GLFW and window
     GLFWwindow *window = initializeWindow();
 
-    // Initialize ImGui
+    planes.reserve(13); // Reserve space for all 13 planes
+    cubes.reserve(1);
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
@@ -425,62 +508,32 @@ int main(int argc, char *argv[])
         spdlog::error("Failed to load font file");
         return -1;
     }
+    else
+    {
+        spdlog::info("Font loaded successfully for ImGui");
+    }
 
-    // Setup ImGui style    
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330 core");
 
-    // Setup shaders
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
-    glCompileShader(vertex_shader);
-    GLint success;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        char infoLog[512];
-        glGetShaderInfoLog(vertex_shader, 512, NULL, infoLog);
-        spdlog::error("Vertex shader compilation failed: {}", infoLog);
-    }
-
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
-    glCompileShader(fragment_shader);
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        char infoLog[512];
-        glGetShaderInfoLog(fragment_shader, 512, NULL, infoLog);
-        spdlog::error("Fragment shader compilation failed: {}", infoLog);
-    }
-
-    GLuint program = glCreateProgram();
-    glAttachShader(program, vertex_shader);
-    glAttachShader(program, fragment_shader);
-    glLinkProgram(program);
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        char infoLog[512];
-        glGetProgramInfoLog(program, 512, NULL, infoLog);
-        spdlog::error("Shader program linking failed: {}", infoLog);
-    }
-
+    GLuint program = createShaderProgram(vertex_shader_text, fragment_shader_text);
     GLint mvp_location = glGetUniformLocation(program, "MVP");
     GLint vpos_location = glGetAttribLocation(program, "vPos");
     GLint vcol_location = glGetAttribLocation(program, "vCol");
     GLint vtex_location = glGetAttribLocation(program, "vTexCoord");
     textureLocation = glGetUniformLocation(program, "textureSampler");
 
-    // Setup cube
-    GLuint cubeVAO, cubeVBO, cubeEBO;
-    glGenVertexArrays(1, &cubeVAO);
-    glBindVertexArray(cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    Cube cube;
+    cubes.push_back(cube);
+    spdlog::info("Cube: {}", cubes.size());
+
+    glGenVertexArrays(1, &cube.VAO);
+    glBindVertexArray(cube.VAO);
+    glGenBuffers(1, &cube.VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, cube.VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-    glGenBuffers(1, &cubeEBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
+    glGenBuffers(1, &cube.EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube.EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(vpos_location);
     glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
@@ -489,62 +542,71 @@ int main(int argc, char *argv[])
     glEnableVertexAttribArray(vtex_location);
     glVertexAttribPointer(vtex_location, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, texCoord));
 
-    // Generate planes  
-    std::vector<Plane> planes;
+    // Define planes
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, 0.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {0.0f, 0.0f, 12.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {12.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {0.0f, 0.0f, -12.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {-12.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {-12.0f, 0.0f, -12.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {12.0f, 0.0f, 12.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {12.0f, 0.0f, -12.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {-12.0f, 0.0f, 12.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {0.0f, 0.0f, 24.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {0.0f, 0.0f, -24.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {24.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
+    planes.emplace_back(Plane{generatePlaneVertices(12.0f, 12.0f, {-24.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}), 0, 0, 0, {0.0f, planes[0].position.y - 1.0f, 0.0f}});
 
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, 0.0f, 0.0f)}); // Ground plane
-
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});    // Back plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // back right
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});    // Right plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // front right
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(0.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // Front plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, -12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)}); // front left
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});   // Left plane
-    planes.push_back({generatePlaneVertices(12.0f, 12.0f, glm::vec3(-12.0f, 0.0f, 12.0f), glm::vec3(0.0f, 0.0f, 0.0f)), 0, 0, 0, glm::vec3(0.0f, planes[0].position.y - 1.0f, 0.0f)});  // back left
+    // Compute world bounds after defining planes
+    worldBounds.min = glm::vec3(std::numeric_limits<float>::max());
+    worldBounds.max = glm::vec3(std::numeric_limits<float>::lowest());
+    for (const auto &plane : planes)
+    {
+        for (const auto &vertex : plane.vertices)
+        {
+            worldBounds.min = glm::min(worldBounds.min, glm::vec3(vertex.pos[0], vertex.pos[1], vertex.pos[2]));
+            worldBounds.max = glm::max(worldBounds.max, glm::vec3(vertex.pos[0], vertex.pos[1], vertex.pos[2]));
+        }
+    }
+    spdlog::info("World bounds: min ({}, {}, {}), max ({}, {}, {})",
+                 worldBounds.min.x, worldBounds.min.y, worldBounds.min.z,
+                 worldBounds.max.x, worldBounds.max.y, worldBounds.max.z);
 
     // Setup plane buffers
     for (auto &plane : planes)
     {
         setupPlaneBuffers(plane, vpos_location, vcol_location, vtex_location);
+        spdlog::info("Plane #{} setup", &plane - &planes[0]);
     }
 
-    // Load textures and make a map for the textures
     std::map<const char *, std::pair<GLuint, const char *>> textures = {
         {"resources\\textures\\cube.png", {loadTexture("resources/textures/concrete.jpg", cubeTexture), "Cube Texture"}},
         {"resources\\textures\\plane.png", {loadTexture("resources/textures/grass.jpg", planeTexture), "Plane Texture"}},
     };
 
-    // Load icon
     GLFWimage icon;
     icon.pixels = stbi_load("resources\\textures\\icon.png", &icon.width, &icon.height, 0, 4);
     glfwSetWindowIcon(window, 1, &icon);
 
-    // Initialize text renderer
     initializeTextRenderer(textRenderer);
 
     double previousTime = glfwGetTime();
-    glm::mat4 model;
     double accumulator = 0.0;
+    glm::mat4 model;
 
     while (!glfwWindowShouldClose(window))
     {
-
-        // Frame timing
         double deltaTime;
         updateFrameTiming(previousTime, deltaTime, accumulator);
 
-        // Get window size
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         float ratio = width / (float)height;
 
-        // Update cube
         glm::mat4 mvp;
-        const int maxUpdates = 5; // Prevent spiral of death
+        const int maxUpdates = 3;
         int updates = 0;
 
-        // Update cube position and orientations
         while (accumulator >= fixedDeltaTime && updates < maxUpdates)
         {
             updateCube(window, model, mvp, width, height, ratio, (float)fixedDeltaTime, planes);
@@ -552,42 +614,29 @@ int main(int argc, char *argv[])
             updates++;
         }
 
-        // Clear the screen
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Render 3D scene
-        renderScene(window, program, mvp_location, cubeVAO, cubeEBO, planes, model, ratio);
+        renderScene(window, program, mvp_location, cube.VAO, cube.EBO, planes, model, ratio);
 
-        // Render ImGui
         if (showDebugGUI)
         {
             renderImGui();
         }
 
-        glEnable(GL_DEPTH_TEST); // Re-enable depth test for next frame
-
-        // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
-
     }
 
-    // Cleanup
-    cleanup(program, cubeVAO, cubeVBO, cubeEBO, planes);
-
+    cleanup(program, cube.VAO, cube.VBO, cube.EBO, planes);
+    glDeleteTextures(1, &cubeTexture);
+    glDeleteTextures(1, &planeTexture);
+    glDeleteProgram(program);
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-    glDeleteShader(vertex_shader);
-    glDeleteShader(fragment_shader);
-
-    if (window)
-    {
-        glfwDestroyWindow(window);
-    }
-
     glfwDestroyWindow(window);
     glfwTerminate();
+
     return 0;
 }

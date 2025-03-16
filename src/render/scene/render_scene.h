@@ -6,7 +6,7 @@
 #include "../../mouse/mouse_position/get_mouse_position.h"
 #include "../setupRenderer.h"
 #include "../imGui/debug_imgui.h"
-#include "structures/plane/plane.h"
+#include "structures/plane/plane_struct.h"
 
 // Cube data
 static const Vertex cubeVertices[8] = {
@@ -151,16 +151,24 @@ bool isCubeCollidingWithPlane(const glm::mat4 &model, const std::vector<Plane> &
         }
         return false;
     };
-
-    collidingPlaneIndex = -1;
+    static int lastCollidingPlaneIndex = 0;
     for (size_t i = 0; i < planes.size(); ++i)
     {
         if (checkCollisionWithPlane(planes[i]))
         {
             collidingPlaneIndex = static_cast<int>(i);
+            lastCollidingPlaneIndex = collidingPlaneIndex + 1;
             return true;
         }
+
+        // if on the last one and first one then increment the lastCollidingPlaneIndex
+        if (i == planes.size() - 1 && lastCollidingPlaneIndex == planes.size())
+        {
+            lastCollidingPlaneIndex += 1;
+            collidingPlaneIndex = lastCollidingPlaneIndex;
+        }
     }
+    collidingPlaneIndex = lastCollidingPlaneIndex;
     return false;
 }
 

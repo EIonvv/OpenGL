@@ -10,7 +10,6 @@
 #include "../../globals.h"
 
 // Declare external variables
-extern bool cubePOVMode; // Add this to access cubePOVMode from main.cpp
 
 static TextRenderer *keyboardTextRenderer = nullptr;
 static bool showDebugGUI = false; // Flag to control debug text rendering

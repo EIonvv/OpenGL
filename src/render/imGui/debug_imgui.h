@@ -13,17 +13,38 @@ static void renderImGui()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    // Calculate FPS loss (difference between targetFPS and currentFPS, if current is lower)
+    float fpsLoss = (currentFPS < targetFPS) ? static_cast<float>(targetFPS - currentFPS) : 0.0f;
+
     // clang-format off
     // ImGui window
     ImGui::Begin("Debug Window");
-    ImGui::Text("FPS:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%.1f", currentFPS);
+    ImGui::Text("FPS:"); 
+    ImGui::SameLine(); 
+    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%.1f", currentFPS);
+    ImGui::SameLine(); 
+    ImGui::Text("( Loss:"); 
+    ImGui::SameLine(); 
+    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "%.1f", fpsLoss); 
+    ImGui::SameLine(); 
+    ImGui::Text(")");
+
     ImGui::Text("OpenGL:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", glGetString(GL_VERSION));
     ImGui::Text("GPU:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "%s", glGetString(GL_RENDERER));
+
+    ImGui::Separator();
+
     ImGui::Text("Cube Rotation:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "(%.1f, %.1f)", rotationAngles.x, rotationAngles.y);
     ImGui::Text("Cube Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(%.2f, %.2f, %.2f)", SquarePos.x, SquarePos.y, SquarePos.z);
     ImGui::Text("Camera Position:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.5f, 0.0f, 0.5f, 1.0f), "(%.2f, %.2f, %.2f)", cameraPos.x, cameraPos.y, cameraPos.z);
-    ImGui::Text("Box Collision:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s with plane %d", isColliding ? "Colliding" : "Not colliding", collidingPlaneIndex);
-
+    
+    // ImGui::Text("Box Collision:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s with plane %d", isColliding ? "Colliding" : "Not colliding", collidingPlaneIndex);
+    // ImGui::Text("Total Planes:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%d", planes.size());
+    // Display the amount of Planes and the current Plane index
+    // Draw a line to separate the text
+    ImGui::Separator();
+    ImGui::Text("Total Planes:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%d", planes.size());
+    ImGui::Text("Current Plane:"); ImGui::SameLine(); ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%d", collidingPlaneIndex);
     // clang-format on
 
     // Set button style for dark mode
@@ -44,6 +65,5 @@ static void renderImGui()
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
-
 
 #endif /* CUSTOM_IMGUI_H */

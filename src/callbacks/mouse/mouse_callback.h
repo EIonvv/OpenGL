@@ -17,7 +17,6 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
     {
         if (action == GLFW_PRESS)
         {
-            isDragging = true;
             if (mode == debug)
             {
                 spdlog::info("{}: Mouse button pressed", __func__);
@@ -29,7 +28,6 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
             {
                 spdlog::info("{}: Mouse button released", __func__);
             }
-            isDragging = false;
         }
     }
 }
